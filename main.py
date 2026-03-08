@@ -3,33 +3,31 @@ import utils
 import P_R
 
 def main():
-    game_grid = classes.grid()
-    game_grid.import_grid("ttr_europe_map_data.csv")
+    game_graph = classes.graph()
+    game_graph.import_graph("ttr_europe_map_data.csv")
     player1 = classes.player("human")
     player2 = classes.player("AI")
     players = [player1, player2]
 
-    game = classes.game(game_grid, players)
+    game = classes.game(game_graph, players)
 
     print("Game created successfully")
-    print(f"Nodes: {len(game.grid.get_nodes())}")
-    print(f"Paths: {len(game.grid.get_paths())}")
+    print(f"Nodes: {len(game.graph.get_nodes())}")
+    print(f"Paths: {len(game.graph.get_paths())}")
     print(f"Players: {[player.name for player in players]}")
 
 
     # Player test
     print("\n")
-    start_node = game_grid.nodes[10]
-    end_node = game_grid.nodes[30]
-    print(start_node)
-    print(end_node)
-    player1.route = [start_node, end_node]
+    player1.give_route()
+    print(player1.route["start"])
+    print(player1.route["end"])
 
-    game.grid.claim_path(game.grid.paths[0], player1)
-    game.grid.claim_path(game.grid.paths[1], player1)
-    game.grid.claim_path(game.grid.paths[2], player1)
+    game.graph.claim_path(game.graph.paths[0], player1)
+    game.graph.claim_path(game.graph.paths[1], player1)
+    game.graph.claim_path(game.graph.paths[2], player1)
 
-    for path in game.grid.paths:
+    for path in game.graph.paths:
         if path.occupation == "human": print(path)
 
     Pr = P_R.P_R(game, player1)

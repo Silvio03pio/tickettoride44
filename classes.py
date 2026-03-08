@@ -55,13 +55,13 @@ class path:
             return f"path({self.nodes[0].name} <-> {self.nodes[1].name}, {self.distance}, {self.colour})"
         return f"path(unconnected, {self.distance}, {self.colour})"
 
-class grid:
+class graph:
     def __init__(self):
         self.nodes = []
         self.paths = []
 
-    def import_grid(self, grid_file):
-        df = pd.read_csv(grid_file)
+    def import_graph(self, graph_file):
+        df = pd.read_csv(graph_file)
 
         self.nodes = []
         self.paths = []
@@ -142,13 +142,25 @@ class player:
         self.cards = []
         self.route = None
         self.trains = 44
+
+    def give_route(self):
+
+        # Apply random functions here sometime
+        start = "Brest"
+        end = "Petrograd"
+        points = 21
+        self.route = {
+            "start": start,
+            "end": end,
+            "points": points
+        }
     
     def __repr__(self):
         return f"player({self.name})"
 
 class game:
-    def __init__(self, grid, players):
-        self.grid = grid
+    def __init__(self, graph, players):
+        self.graph = graph
         self.players = []
         self.current_player = 0
         self.current_round = 0
@@ -156,17 +168,17 @@ class game:
 # For testing purposes
 
 def main():
-    test_grid = grid()
-    test_grid.import_grid("ttr_europe_map_data.csv")
+    test_graph = graph()
+    test_graph.import_graph("ttr_europe_map_data.csv")
 
     print("Nodes:")
-    print(test_grid.get_nodes())
+    print(test_graph.get_nodes())
 
     print("\nPaths:")
-    print(test_grid.get_paths()[:10])  # print first 10 paths
+    print(test_graph.get_paths()[:10])  # print first 10 paths
 
     print("\nN:")
-    print(test_grid.N)
+    print(test_graph.N)
 
 
 if __name__ == '__main__':

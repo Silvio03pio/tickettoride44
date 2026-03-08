@@ -2,12 +2,12 @@ from collections import deque
 import classes
 import heapq
 
-def find_longest_possible_route(grid):
+def find_longest_possible_route(graph):
     """
     Finds the longest shortest path in the graph, measured in number of paths (edges).
 
     What this means:
-    - For every pair of nodes in the grid, we imagine the shortest route between them,
+    - For every pair of nodes in the graph, we imagine the shortest route between them,
       where each traversed path counts as 1 step.
     - Among all of those shortest routes, we find the one that is longest.
     - This is the graph's "diameter" in terms of edge count.
@@ -22,16 +22,16 @@ def find_longest_possible_route(grid):
 
     Algorithm used:
     - For every start node, compute shortest path lengths to all other nodes.
-    - The helper _bfs_shortest_path_lengths(start_node, grid) now uses
-      shortest_path_between_two_nodes(node1, node2, grid) for each target node.
+    - The helper _bfs_shortest_path_lengths(start_node, graph) now uses
+      shortest_path_between_two_nodes(node1, node2, graph) for each target node.
 
     Time complexity:
     - This version is simpler conceptually, but less efficient than one BFS from each node,
       because it runs a BFS separately for each pair of nodes.
     """
 
-    # Edge case: empty grid
-    if not grid.nodes:
+    # Edge case: empty graph
+    if not graph.nodes:
         return (0, None, None)
 
     longest_distance = -1
@@ -39,8 +39,8 @@ def find_longest_possible_route(grid):
     longest_end = None
 
     # Run "all target nodes from one start node"
-    for start_node in grid.nodes:
-        distances = _bfs_shortest_path_lengths(start_node, grid)
+    for start_node in graph.nodes:
+        distances = _bfs_shortest_path_lengths(start_node, graph)
 
         for end_node, distance in distances.items():
             if distance > longest_distance and distance != float("inf"):
@@ -50,7 +50,7 @@ def find_longest_possible_route(grid):
 
     return (longest_distance, longest_start, longest_end)
 
-def shortest_path_between_two_nodes(node1, node2, grid):
+def shortest_path_between_two_nodes(node1, node2, graph):
     """
     Returns the shortest distance in number of edges between node1 and node2
     using BFS.
@@ -58,7 +58,7 @@ def shortest_path_between_two_nodes(node1, node2, grid):
     Args:
         node1: start node
         node2: target node
-        grid: the graph containing the nodes
+        graph: the graph containing the nodes
 
     Returns:
         int or float('inf'):
@@ -66,7 +66,7 @@ def shortest_path_between_two_nodes(node1, node2, grid):
             - float('inf') if node2 is unreachable from node1
     """
 
-    if node1 not in grid.nodes or node2 not in grid.nodes:
+    if node1 not in graph.nodes or node2 not in graph.nodes:
         return float("inf")
 
     if node1 == node2:
@@ -86,7 +86,7 @@ def shortest_path_between_two_nodes(node1, node2, grid):
                 else p.get_start_node()
             )
 
-            if neighbor not in grid.nodes or neighbor in visited:
+            if neighbor not in graph.nodes or neighbor in visited:
                 continue
 
             if neighbor == node2:
@@ -97,9 +97,9 @@ def shortest_path_between_two_nodes(node1, node2, grid):
 
     return float("inf")
 
-def _bfs_shortest_path_lengths(start_node, grid):
+def _bfs_shortest_path_lengths(start_node, graph):
     """
-    Returns the shortest number of edges from start_node to every node in grid.
+    Returns the shortest number of edges from start_node to every node in graph.
 
     This keeps the same name/signature as before so other files do not need to change.
     Internally, it now uses shortest_path_between_two_nodes(...) for each target node.
@@ -111,8 +111,8 @@ def _bfs_shortest_path_lengths(start_node, grid):
     """
     distances = {}
 
-    for node in grid.nodes:
-        distances[node] = shortest_path_between_two_nodes(start_node, node, grid)
+    for node in graph.nodes:
+        distances[node] = shortest_path_between_two_nodes(start_node, node, graph)
 
     return distances
 
@@ -122,11 +122,11 @@ def build_graph_of_player_from_node(node, player):
     starting from the given node.
 
     Returns:
-        classes.grid: a new graph containing only the connected component
+        classes.graph: a new graph containing only the connected component
         of player-owned paths reachable from the starting node.
     """
 
-    player_graph = classes.grid()
+    player_graph = classes.graph()
     player_graph.add_node(node)
 
     visited_nodes = set()
@@ -292,4 +292,14 @@ def find_shortest_connection_between_subgraphs(subgraph_a, subgraph_b):
                 )
                 counter += 1
 
-    return None
+    return 
+    
+def get_node_from_name(graph, name):
+    for node in graph.nodes:
+        if name == node.name: return node
+    return False
+
+def get_path_from_id(graph, id):
+    for path in graph.nodes:
+        if id == path.name: return path
+    return False  
