@@ -22,11 +22,12 @@ class node:
         return f"node({self.name})"
 
 class path:
-    def __init__(self, distance, colour):
+    def __init__(self, distance, colour, path_id):
         self.nodes = []
         self.distance = int(distance)
         self.colour = colour
         self.occupation = None
+        self.path_id = path_id
 
     def get_start_node(self):
         return self.nodes[0]
@@ -46,6 +47,9 @@ class path:
     def set_occupation(self, player):
         self.occupation = player.name
 
+    def get_path_id(self):
+        return self.path_id
+
     def __repr__(self):
         if len(self.nodes) == 2:
             return f"path({self.nodes[0].name} <-> {self.nodes[1].name}, {self.distance}, {self.colour})"
@@ -55,8 +59,6 @@ class grid:
     def __init__(self):
         self.nodes = []
         self.paths = []
-        self.longest_possible_route = None  # set after importing the grid
-        self.N = None
 
     def import_grid(self, grid_file):
         df = pd.read_csv(grid_file)
@@ -84,7 +86,8 @@ class grid:
         for _, row in path_rows.iterrows():
             p = path(
                 distance=int(row["length"]),
-                colour=row["color"]
+                colour=row["color"],
+                path_id=row["path_id"]
             )
 
             start = node_lookup[row["source"]]
@@ -96,20 +99,31 @@ class grid:
             end.add_path(p)
 
             self.add_path(p)
-        self.longest_possible_route = utils.find_longest_possible_route(self)
-        self.N = self.longest_possible_route[0]
 
     def add_node(self, node):
-        self.nodes.append(node)
+        if node not in self.nodes:
+            self.nodes.append(node)
+        return node
 
     def add_path(self, path):
         self.paths.append(path)
+        self.add_node(path.nodes[0])
+        self.add_node(path.nodes[1])
+        # self.longest_possible_route = utils.find_longest_possible_route(self)
+        # self.N = self.longest_possible_route[0]
 
     def get_nodes(self):
         return self.nodes
 
     def get_paths(self):
         return self.paths
+
+    def claim_path(self, path, player):
+        for p in self.paths:
+            if p.get_path_id() == path.get_path_id():
+                p.set_occupation(player)
+                return True 
+        return False
 
 class card:
     def __init__(self, colour):
