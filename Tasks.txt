@@ -1,9 +1,13 @@
 Tasks
 
-- Make U(s)
+- Make U(s) (Silvio)
+- Fix word doc (Edda)
+- Think about how we create actions, new class? (Edda and Hakon)
 - Make E(s)
-- Make P_R(s)
-- Make P_L(s)
-- Make C_c(s)
-- Make P_colour(s)
+- Make terminal test
+- Make P_R(s) (Hákon)
+- Make P_L(s) (Saskia)
+- Make C_c(s) (Silvio)
+- Make P_colour(s) (Saskia)
+- Make P_opp(s, a) (Edda and Hakon)
 - Make main functions
