@@ -1,0 +1,9 @@
+Tasks
+
+- Make U(s)
+- Make E(s)
+- Make P_R(s)
+- Make P_L(s)
+- Make C_c(s)
+- Make P_colour(s)
+- Make main functions
