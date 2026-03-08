@@ -14,7 +14,6 @@ def main():
     print(f"Nodes: {len(game_grid.get_nodes())}")
     print(f"Paths: {len(game_grid.get_paths())}")
     print(f"Players: {[player.name for player in players]}")
-    print(f"N: {game_grid.N}")
     print(f"Longest possible route: {game_grid.longest_possible_route}")
 
 if __name__ == "__main__":
