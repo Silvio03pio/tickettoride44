@@ -303,3 +303,25 @@ def get_path_from_id(graph, id):
     for path in graph.nodes:
         if id == path.name: return path
     return False  
+
+def find_longest_simple_path(player_graph):
+    if not player_graph.paths:
+        return 0
+    best = [0]
+    def dfs(current_node, visited_nodes, depth):
+        best[0] = max(best[0], depth)
+        for p in current_node.get_connected_paths():
+            if p not in player_graph.paths:
+                continue
+            neighbor = (
+                p.get_end_node()
+                if p.get_start_node() == current_node
+                else p.get_start_node()
+            )
+            if neighbor not in visited_nodes:
+                visited_nodes.add(neighbor)
+                dfs(neighbor, visited_nodes, depth + 1)
+                visited_nodes.remove(neighbor)
+    for start_node in player_graph.nodes:
+        dfs(start_node, {start_node}, 0)
+    return best[0]
