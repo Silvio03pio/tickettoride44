@@ -12,6 +12,7 @@ def main():
     players = [player1, player2]
 
     game = classes.game(game_graph, players)
+    game.deck = P_colour.deck()
 
     print("Game created successfully")
     print(f"Nodes: {len(game.graph.get_nodes())}")
@@ -48,6 +49,21 @@ def main():
     print(f"AI longest: {ai_longest}")
     print(f"Human longest: {opp_longest}")
     print(f"Probability of winning longest path bonus: {Pl}")
+
+
+    # P_colour test
+    game.deck.draw_card("blue")    # draw 1 blue
+    game.deck.draw_card("blue")    # draw 1 blue
+    game.deck.draw_card("blue")    # draw 1 blue
+    game.deck.draw_card("blue")    # draw 1 blue  → 4 blue on the hand
+    game.deck.draw_card("red")     # draw 1 red
+    game.deck.draw_card("red")     # draw 1 red   → 2 red on the hand
+    game.deck.play_card("blue", 3) # claims a route with three blue → 1 blue in hand
+    
+    print(f"\nP(blue) = {game.deck.P_colour('blue'):.4f}")
+    print(f"P(red)  = {game.deck.P_colour('red'):.4f}")
+    print(f"All colours: {game.deck.all_probabilities()}")
+
 
 if __name__ == "__main__":
     main()
