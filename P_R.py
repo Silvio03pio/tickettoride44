@@ -14,10 +14,14 @@ def P_R(game, player):
     longest_possible = utils.find_longest_possible_route(game.graph)
     longest_possible_length = longest_possible[0]
 
-    # Derived from formula
-    speculated_odds_of_achieving = (longest_possible_length - 2*shortest_connection_length) / longest_possible_length
+    # To match with word file
+    N = longest_possible_length
+    N_shortest = shortest_connection_length
 
-    return speculated_odds_of_achieving
+    # ormula
+    print(f"N = {N}, N_shortest = {N_shortest}")
+    P_R = (N - N_shortest) / N *2
+    return P_R
 
 
 
