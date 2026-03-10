@@ -2,6 +2,8 @@
 # It estimates how valuable the current hand is with respect to currently claimable board actions.
 # For each free path, it combines immediate route reward, colour draw probability, and cards in hand.
 
+import P_colour
+
 def points_for_path_length(length):
     """
     Returns the standard Ticket to Ride score for a claimed path length.
@@ -83,7 +85,8 @@ def C_c(game, player):
             continue
 
         # Probability of drawing this colour from the remaining deck
-        p_colour = game.deck.P_colour(colour)
+        # p_colour = game.deck.P_colour(colour) # old
+        p_colour = P_colour.P_colour(game.deck, colour) # new
 
         # Number of cards of this colour currently in player's hand
         cards_in_hand = count_colour_in_player_hand(player, colour)
@@ -109,7 +112,8 @@ def C_c_breakdown(game, player):
         if colour is None:
             continue
 
-        p_colour = game.deck.P_colour(colour)
+        # p_colour = game.deck.P_colour(colour) # old
+        p_colour = P_colour.P_colour(game.deck, colour) # new
         cards_in_hand = count_colour_in_player_hand(player, colour)
         delta = delta_C_a(path)
 

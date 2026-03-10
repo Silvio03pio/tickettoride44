@@ -5,8 +5,6 @@ from collections import deque
 # destination ticket completion, and longest path bonus.
 
 import P_L
-
-
 def points_for_path_length(length):
     """
     Returns the number of points awarded for claiming a route
