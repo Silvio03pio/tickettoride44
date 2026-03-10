@@ -22,21 +22,7 @@ def main():
 
 
     # ---------------------------------- TEST ----------------------------------
-    # Player test
-    print("\n")
-    player1.give_route()
-    print(player1.route["start"])
-    print(player1.route["end"])
 
-    game.graph.claim_path(game.graph.paths[0], player1)
-    game.graph.claim_path(game.graph.paths[1], player1)
-    game.graph.claim_path(game.graph.paths[2], player1)
-
-    for path in game.graph.paths:
-        if path.occupation == "human": print(path)
-
-    Pr = P_R.P_R(game, player1)
-    print(f"Speculated odds of achievign route: {Pr}")
 
 
     #Test for P_L
@@ -53,9 +39,19 @@ def main():
     print(f"Human longest: {opp_longest}")
     print(f"Probability of winning longest path bonus: {Pl}")
 
-    # P_colour test
+    # P_colour 
     print("\n--- P_COLOUR TEST ---")
-    game.deck.ai_draw_card("blue")    # draw 1 blue
+    prop = P_colour.P_colour(game.deck, "blue")
+    print(f"Propability of blue: {prop}")
+    game.deck.shuffle()
+    for i in range(10): # draw 10 cards from deck
+        player1.draw_card(game.deck)
+    print(f"Player 1 cards: {player1.cards}")
+    prop = P_colour.P_colour(game.deck, "blue")
+    print(f"probability of blue now: {prop}")
+    
+    """
+    game.draw_card("blue")    # draw 1 blue
     game.deck.ai_draw_card("blue")    # draw 1 blue
     game.deck.ai_draw_card("blue")    # draw 1 blue
     game.deck.ai_draw_card("blue")    # draw 1 blue  → 4 blue in AI hand
@@ -66,7 +62,7 @@ def main():
     print(f"\nP(blue) = {P_colour.P_colour(game.deck, 'blue'):.4f}")
     print(f"P(red)  = {P_colour.P_colour(game.deck, 'red'):.4f}")
     print(f"All colours: {P_colour.all_probabilities(game.deck)}")
-
+    """
         
     # Utility U(s) test
     breakdown = U_s.utility_breakdown(game, player2, player1)

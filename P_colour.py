@@ -9,7 +9,7 @@ def P_colour(deck, colour):
     / (#total   - (#played          + #in hands))
     """
     numerator   = deck.get_colour_count(colour)
-    denominator = deck.get_total_remaining()
+    denominator = deck.get_card_count() # Remaining
 
     if denominator == 0:
         return 0.0  # deck is empty

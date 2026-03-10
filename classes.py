@@ -1,6 +1,6 @@
 import pandas as pd
 from collections import deque, Counter
-import utils
+import random
 
 class node:
     def __init__(self, name, longitude, latitude):
@@ -154,54 +154,63 @@ class player:
             "end": end,
             "points": points
         }
+        
+    def draw_card(self, deck):
+        if deck.cards: 
+            card = deck.cards.pop(0) # remocves top card from deck
+            self.cards.append(card)
+        else: 
+            return False # No cards in deck
+    
+    def place_trains(self, path):
+        colour = path.colour
+        train_count = path.distance
+
+        matching_cards = [card for card in self.cards if card.colour == colour]
+
+        if len(matching_cards) < train_count:
+            return False
+
+        cards_to_remove = matching_cards[:train_count]
+        for card in cards_to_remove:
+            self.cards.remove(card)
+
+        path.occupation = self.name
+        self.trains -= train_count
+
+        return path
     
     def __repr__(self):
         return f"player({self.name})"
 
 
 COLOURS = ["red", "blue", "green", "yellow", "black", "white", "orange", "pink"]
-CARDS_PER_COLOUR = 12
+NBR_OF_CARDS_PER_COLOUR = 12
+
 class deck:
-    def __init__(self, colours=COLOURS, cards_per_colour=CARDS_PER_COLOUR):
-        self.colours = colours
-        self.total_cards = cards_per_colour * len(colours)
-        self.colour_counts = Counter({colour: cards_per_colour for colour in colours})
-        self.played_cards = Counter()
-        self.ai_hand = Counter()        # held by ai player
-        self.opp_hand = Counter()       # held by opp player
+    def __init__(self, colours=COLOURS, nbr_of_cards_per_colour=NBR_OF_CARDS_PER_COLOUR): 
+        # The cards themselves are the only stores attributes
+        # Lets make the colours an attribute too cause they dont change
+        self.cards = self.build_deck(colours, nbr_of_cards_per_colour)
+        self.colours = COLOURS
 
-    # AI draws a card
-    def ai_draw_card(self, colour, count=1):
-        self.ai_hand[colour] += count
-    # AI plays a card
-    def ai_play_card(self, colour, count=1):
-        self.ai_hand[colour] -= count
-        self.played_cards[colour] += count
+    def build_deck(self, colours, nbr_of_cards_per_colour):
+        cards = []
+        for colour in colours:
+            for i in range(nbr_of_cards_per_colour):
+                current_card = card(colour)
+                cards.append(current_card)
+        return cards
 
-    # Opponent draws a card, AI does not know which colour 
-    def opp_draw_card(self, count=1):
-        self.opp_hand["unknown"] += count
+    def shuffle(self):
+        self.deck = random.shuffle(self.cards)
 
-    def opp_play_card(self, colour, count=1):
-        self.opp_hand["unknown"] -= count
-        self.played_cards[colour] += count
+    def get_card_count(self): # Number of cards not stored, only counted when needed
+        return len(self.cards)
 
     def get_colour_count(self, colour):
-        return (
-            self.colour_counts[colour]
-            - self.played_cards[colour]
-            - self.ai_hand[colour]
-            - self.opp_hand[colour]
-        )
+        return sum(card.colour == colour for card in self.cards)
 
-    def get_total_remaining(self):
-        return (
-            self.total_cards
-            - sum(self.played_cards.values())
-            - sum(self.ai_hand.values())
-            - sum(self.opp_hand.values())
-        )
-    
 class game:
     def __init__(self, graph, players):
         self.graph = graph

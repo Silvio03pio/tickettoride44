@@ -22,8 +22,8 @@ def find_longest_possible_route(graph):
 
     Algorithm used:
     - For every start node, compute shortest path lengths to all other nodes.
-    - The helper _bfs_shortest_path_lengths(start_node, graph) now uses
-      shortest_path_between_two_nodes(node1, node2, graph) for each target node.
+    - The helper _bfs_shortest_route_lengths(start_node, graph) now uses
+      shortest_route_between_two_nodes(node1, node2, graph) for each target node.
 
     Time complexity:
     - This version is simpler conceptually, but less efficient than one BFS from each node,
@@ -40,7 +40,7 @@ def find_longest_possible_route(graph):
 
     # Run "all target nodes from one start node"
     for start_node in graph.nodes:
-        distances = _bfs_shortest_path_lengths(start_node, graph)
+        distances = _bfs_shortest_route_lengths(start_node, graph)
 
         for end_node, distance in distances.items():
             if distance > longest_distance and distance != float("inf"):
@@ -50,7 +50,7 @@ def find_longest_possible_route(graph):
 
     return (longest_distance, longest_start, longest_end)
 
-def shortest_path_between_two_nodes(node1, node2, graph):
+def shortest_route_between_two_nodes(node1, node2, graph):
     """
     Returns the shortest distance in number of edges between node1 and node2
     using BFS.
@@ -97,12 +97,12 @@ def shortest_path_between_two_nodes(node1, node2, graph):
 
     return float("inf")
 
-def _bfs_shortest_path_lengths(start_node, graph):
+def _bfs_shortest_route_lengths(start_node, graph):
     """
     Returns the shortest number of edges from start_node to every node in graph.
 
     This keeps the same name/signature as before so other files do not need to change.
-    Internally, it now uses shortest_path_between_two_nodes(...) for each target node.
+    Internally, it now uses shortest_route_between_two_nodes(...) for each target node.
 
     Returns:
         dict[node, int]:
@@ -112,7 +112,7 @@ def _bfs_shortest_path_lengths(start_node, graph):
     distances = {}
 
     for node in graph.nodes:
-        distances[node] = shortest_path_between_two_nodes(start_node, node, graph)
+        distances[node] = shortest_route_between_two_nodes(start_node, node, graph)
 
     return distances
 
