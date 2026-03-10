@@ -6,35 +6,34 @@ import P_colour
 import U_s
 import C_c
 
-def main():
+def main(): 
+
+    # Graph - Map
     game_graph = classes.graph()
     game_graph.import_graph("ttr_europe_map_data.csv")
+
+    # Players
     player1 = classes.player("human")
     player2 = classes.player("AI")
     players = [player1, player2]
 
-    game = classes.game(game_graph, players)
+    # Deck of train cards
+    deck = classes.deck()
 
-    print("Game created successfully")
-    print(f"Nodes: {len(game.graph.get_nodes())}")
-    print(f"Paths: {len(game.graph.get_paths())}")
-    print(f"Players: {[player.name for player in players]}")
+    # Create game
+    game = classes.game(game_graph, players, deck)
 
 
     # ---------------------------------- TEST ----------------------------------
 
 
-
     #Test for P_L
     print("\n--- P_LONGEST PATH TEST ---")
-    game.graph.claim_path(game.graph.paths[10], player2)
-    game.graph.claim_path(game.graph.paths[11], player2)
-    game.players = [player1, player2]
-    N = utils.find_longest_possible_route(game.graph)[0]
+    player2.claim_path(game.graph.paths[10])
+    player2.claim_path(game.graph.paths[11])
     ai_longest = P_L._longest_chain_for_player(game.graph, player2)
     opp_longest = P_L._longest_chain_for_player(game.graph, player1)
-    Pl = P_L.P_longest_path(game)
-    print(f"N (gesamt): {N}")
+    Pl = P_L.P_L(game, player2)
     print(f"AI longest: {ai_longest}")
     print(f"Human longest: {opp_longest}")
     print(f"Probability of winning longest path bonus: {Pl}")
@@ -95,6 +94,7 @@ def main():
 
     print("\n--- C_c(s) TEST ---")
     print("C_c(s) =", cc_value)
+    # print("C_c breakdown", cc_breakdown)
 
   #  print("\nFirst 5 contributions:")
   #  for item in cc_breakdown["details"][:5]:

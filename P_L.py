@@ -1,13 +1,15 @@
 import classes
 import utils
 
-def P_longest_path(game): #change name!!!
+def P_L(game, player):
     """
     Estimates the probability that the AI wins the Longest Path bonus.
         N_consec_AI    = the longest simple path through the AI's claimed edges.
         N_consec_Opp   = the longest simple path through the opponent's claimed edges.
     """
 
+    # Old: only two players, only works for AI, assumes AI is players[0]
+    """ 
     player1 = game.players[0]  # human
     player2 = game.players[1]  # AI
 
@@ -15,11 +17,21 @@ def P_longest_path(game): #change name!!!
     n_consecutive_opp = _longest_chain_for_player(game.graph, player1)
 
     denominator = n_consecutive_ai + n_consecutive_opp
+    """ 
+    # New: any number of players, player is the input player not just players[0]
+    n_consecutive = _longest_chain_for_player(game.graph, player)
+
+    denominator = 0
+    for p in game.players:
+        denominator += _longest_chain_for_player(game.graph, p)
+        print(f"{p}: denominator = {denominator}")
+
     if denominator == 0:
         return 0.0
 
-    prob = (n_consecutive_ai / denominator)
-    return max(0.0, min(1.0, prob))
+    print(f"n_consecutive = {n_consecutive}")
+    prob = (n_consecutive / denominator)
+    return max(0.0, min(1.0, prob)) # prob will always be between 0 and 1 anyway?
 
 
 def _longest_chain_for_player(full_graph, player):

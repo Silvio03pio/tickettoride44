@@ -2,6 +2,9 @@ import pandas as pd
 from collections import deque, Counter
 import random
 
+COLOURS = ["red", "blue", "green", "yellow", "black", "white", "orange", "pink"]
+NBR_OF_CARDS_PER_COLOUR = 12
+
 class node:
     def __init__(self, name, longitude, latitude):
         self.name = name
@@ -54,6 +57,11 @@ class path:
         if len(self.nodes) == 2:
             return f"path({self.nodes[0].name} <-> {self.nodes[1].name}, {self.distance}, {self.colour})"
         return f"path(unconnected, {self.distance}, {self.colour})"
+
+class route_card:
+    def __init__(self, destinations, points):
+        self.destinations = destinations
+        self.points = points
 
 class graph:
     def __init__(self):
@@ -140,8 +148,9 @@ class player:
         self.name = name
         self.score = 0
         self.cards = []
-        self.route = None
+        self.route = None # this is a route_card object
         self.trains = 44
+        self.P_R = 21 # will be removed and only stored in self.route
 
     def give_route(self):
 
@@ -154,11 +163,14 @@ class player:
             "end": end,
             "points": points
         }
-        
+
+    def add_card_to_hand(self, card): 
+        self.cards.append(card) 
+
     def draw_card(self, deck):
         if deck.cards: 
             card = deck.cards.pop(0) # remocves top card from deck
-            self.cards.append(card)
+            self.add_card_to_hand(card)
         else: 
             return False # No cards in deck
     
@@ -180,19 +192,15 @@ class player:
 
         return path
     
+    def claim_path(self, path):
+        path.occupation = self.name
+
     def __repr__(self):
         return f"player({self.name})"
 
-
-COLOURS = ["red", "blue", "green", "yellow", "black", "white", "orange", "pink"]
-NBR_OF_CARDS_PER_COLOUR = 12
-
 class deck:
     def __init__(self, colours=COLOURS, nbr_of_cards_per_colour=NBR_OF_CARDS_PER_COLOUR): 
-        # The cards themselves are the only stores attributes
-        # Lets make the colours an attribute too cause they dont change
         self.cards = self.build_deck(colours, nbr_of_cards_per_colour)
-        self.colours = COLOURS
 
     def build_deck(self, colours, nbr_of_cards_per_colour):
         cards = []
@@ -212,12 +220,18 @@ class deck:
         return sum(card.colour == colour for card in self.cards)
 
 class game:
-    def __init__(self, graph, players):
+    def __init__(self, graph, players, deck, longest_route_points=10):
         self.graph = graph
         self.players = players
         self.current_player = 0
         self.current_round = 0
-        self.deck = deck()
+        self.deck = deck
+        self.longest_route_points = longest_route_points
+
+        print("Game created successfully")
+        print(f"Nodes: {len(self.graph.get_nodes())}")
+        print(f"Paths: {len(self.graph.get_paths())}")
+        print(f"Players: {[player.name for player in self.players]}")
 
 # For testing purposes
 
