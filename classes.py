@@ -1,5 +1,5 @@
 import pandas as pd
-from collections import deque
+from collections import deque, Counter
 import utils
 
 class node:
@@ -158,12 +158,57 @@ class player:
     def __repr__(self):
         return f"player({self.name})"
 
+
+COLOURS = ["red", "blue", "green", "yellow", "black", "white", "orange", "pink"]
+CARDS_PER_COLOUR = 12
+class deck:
+    def __init__(self, colours=COLOURS, cards_per_colour=CARDS_PER_COLOUR):
+        self.colours = colours
+        self.total_cards = cards_per_colour * len(colours)
+        self.colour_counts = Counter({colour: cards_per_colour for colour in colours})
+        self.played_cards = Counter()
+        self.ai_hand = Counter()        # held by ai player
+        self.opp_hand = Counter()       # held by opp player
+
+    # AI draws a card
+    def ai_draw_card(self, colour, count=1):
+        self.ai_hand[colour] += count
+    # AI plays a card
+    def ai_play_card(self, colour, count=1):
+        self.ai_hand[colour] -= count
+        self.played_cards[colour] += count
+
+    # Opponent draws a card, AI does not know which colour 
+    def opp_draw_card(self, count=1):
+        self.opp_hand["unknown"] += count
+
+    def opp_play_card(self, colour, count=1):
+        self.opp_hand["unknown"] -= count
+        self.played_cards[colour] += count
+
+    def get_colour_count(self, colour):
+        return (
+            self.colour_counts[colour]
+            - self.played_cards[colour]
+            - self.ai_hand[colour]
+            - self.opp_hand[colour]
+        )
+
+    def get_total_remaining(self):
+        return (
+            self.total_cards
+            - sum(self.played_cards.values())
+            - sum(self.ai_hand.values())
+            - sum(self.opp_hand.values())
+        )
+    
 class game:
     def __init__(self, graph, players):
         self.graph = graph
-        self.players = []
+        self.players = players
         self.current_player = 0
         self.current_round = 0
+        self.deck = deck()
 
 # For testing purposes
 
