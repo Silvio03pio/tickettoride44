@@ -1,7 +1,7 @@
 import classes
 import utils
 
-def P_longest_path(game):
+def P_longest_path(game): #change name!!!
     """
     Estimates the probability that the AI wins the Longest Path bonus.
     Derives players from game.players, following the convention in main.py:
@@ -35,7 +35,7 @@ def P_longest_path(game):
     if denominator == 0:
         return 0.0
 
-    prob = (n_consecutive_ai / denominator) * (n_consecutive_ai / N)
+    prob = (n_consecutive_ai / denominator)
     return max(0.0, min(1.0, prob))
 
 
