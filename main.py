@@ -40,6 +40,7 @@ def main():
 
 
     #Test for P_L
+    print("\n--- P_LONGEST PATH TEST ---")
     game.graph.claim_path(game.graph.paths[10], player2)
     game.graph.claim_path(game.graph.paths[11], player2)
     game.players = [player1, player2]
@@ -54,6 +55,7 @@ def main():
 
 
     # P_colour test
+    print("\n--- P_COLOUR TEST ---")
     game.deck.draw_card("blue")    # draw 1 blue
     game.deck.draw_card("blue")    # draw 1 blue
     game.deck.draw_card("blue")    # draw 1 blue
