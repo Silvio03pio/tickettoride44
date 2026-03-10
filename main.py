@@ -3,6 +3,8 @@ import utils
 import P_R
 import P_L
 import P_colour
+import U_s
+import C_c
 
 def main():
     game_graph = classes.graph()
@@ -38,6 +40,7 @@ def main():
 
 
     #Test for P_L
+    print("\n--- P_LONGEST PATH TEST ---")
     game.graph.claim_path(game.graph.paths[10], player2)
     game.graph.claim_path(game.graph.paths[11], player2)
     game.players = [player1, player2]
@@ -52,6 +55,7 @@ def main():
 
 
     # P_colour test
+    print("\n--- P_COLOUR TEST ---")
     game.deck.draw_card("blue")    # draw 1 blue
     game.deck.draw_card("blue")    # draw 1 blue
     game.deck.draw_card("blue")    # draw 1 blue
@@ -63,6 +67,43 @@ def main():
     print(f"\nP(blue) = {game.deck.P_colour('blue'):.4f}")
     print(f"P(red)  = {game.deck.P_colour('red'):.4f}")
     print(f"All colours: {game.deck.all_probabilities()}")
+
+        
+    # Utility U(s) test
+    breakdown = U_s.utility_breakdown(game, player2, player1)
+
+    print("\n--- TERMINAL UTILITY BREAKDOWN ---")
+    print("AI route points:", breakdown["AI"]["route_points"])
+    print("AI ticket points:", breakdown["AI"]["ticket_points"])
+    print("AI longest bonus:", breakdown["AI"]["longest_bonus"])
+    print("AI total:", breakdown["AI"]["total"])
+
+    print("Opponent route points:", breakdown["Opponent"]["route_points"])
+    print("Opponent ticket points:", breakdown["Opponent"]["ticket_points"])
+    print("Opponent longest bonus:", breakdown["Opponent"]["longest_bonus"])
+    print("Opponent total:", breakdown["Opponent"]["total"])
+
+    print("Utility U(s) =", breakdown["utility"])
+
+    
+    # C_c(s) test
+    # Example hand for the AI player
+    player2.cards = [
+        classes.card("blue"),
+        classes.card("blue"),
+        classes.card("red"),
+        classes.card("green")
+    ]
+
+    cc_value = C_c.C_c(game, player2)
+    cc_breakdown = C_c.C_c_breakdown(game, player2)
+
+    print("\n--- C_c(s) TEST ---")
+    print("C_c(s) =", cc_value)
+
+  #  print("\nFirst 5 contributions:")
+  #  for item in cc_breakdown["details"][:5]:
+    #     print(item)
 
 
 if __name__ == "__main__":
