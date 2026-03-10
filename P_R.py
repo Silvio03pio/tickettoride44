@@ -20,7 +20,7 @@ def P_R(game, player):
 
     # ormula
     print(f"N = {N}, N_shortest = {N_shortest}")
-    P_R = (N - N_shortest) / N *2
+    P_R = ((N - N_shortest) / N -0.5) * 2
     return P_R
 
 
