@@ -1,13 +1,14 @@
 Tasks
 
-- Make U(s) (Silvio)
-- Fix word doc (Edda)
+x Make U(s) (Silvio)
+x Fix word doc (Edda)
 - Think about how we create actions, new class? (Edda and Hakon)
 - Make E(s)
 - Make terminal test
 - Make P_R(s) (Hákon)
-- Make P_L(s) (Saskia)
-- Make C_c(s) (Silvio)
+x Make P_L(s) (Saskia)
+x Make C_c(s) (Silvio)
 - Make P_colour(s) (Saskia)
 - Make P_opp(s, a) (Edda and Hakon)
 - Make main functions
+- Write about what we thought in playing the game and how that influenced our modelling
