@@ -1,137 +1,547 @@
-# state.py
+import pandas as pd
+from collections import deque
+import random
+import heapq
 
-from dataclasses import dataclass, field
-from typing import List, Optional, Literal
+COLOURS = ["red", "blue", "green", "yellow", "black", "white", "orange", "pink"]
+NBR_OF_CARDS_PER_COLOUR = 12
 
-import classes  # uses graph, player, deck, route_card as defined there
+class node:
+    def __init__(self, name, longitude, latitude):
+        self.name = name
+        self.connected_paths = []
+        self.longitude = longitude
+        self.latitude = latitude
 
+    def add_path(self, path):
+        self.connected_paths.append(path)
 
-# -------------------------
-# Action representation
-# -------------------------
+    def remove_path(self, path):
+        self.connected_paths.remove(path)
 
-ActionType = Literal["draw_card", "claim_route"]
+    def get_connected_paths(self):
+        return self.connected_paths
 
+    def __repr__(self):
+        return f"node({self.name})"
 
-@dataclass(frozen=True)
-class Action:
+class path:
+    def __init__(self, distance, colour, path_id):
+        self.nodes = []
+        self.distance = int(distance)
+        self.colour = colour
+        self.occupation = None
+        self.path_id = path_id
+
+    def get_start_node(self):
+        return self.nodes[0]
+
+    def get_end_node(self):
+        return self.nodes[1]
+
+    def get_distance(self):
+        return self.distance
+
+    def get_colour(self):
+        return self.colour
+
+    def get_occupation(self):
+        return self.occupation
+
+    def set_occupation(self, player):
+        self.occupation = player.name
+
+    def get_path_id(self):
+        return self.path_id
+
+    def __repr__(self):
+        if len(self.nodes) == 2:
+            return f"path({self.nodes[0].name} <-> {self.nodes[1].name}, {self.distance}, {self.colour})"
+        return f"path(unconnected, {self.distance}, {self.colour})"
+
+class route_card:
+    def __init__(self, destinations, points):
+        self.destinations = destinations
+        self.points = points
+
+class graph:
+    def __init__(self):
+        self.nodes = []
+        self.paths = []
+
+    def import_graph(self, graph_file):
+        df = pd.read_csv(graph_file)
+
+        self.nodes = []
+        self.paths = []
+
+        node_lookup = {}
+
+        # ---- Create nodes ----
+        node_rows = df[df["record_type"] == "node"]
+
+        for _, row in node_rows.iterrows():
+            n = node(
+                name=row["name"],
+                longitude=float(row["longitude"]),
+                latitude=float(row["latitude"])
+            )
+            self.add_node(n)
+            node_lookup[row["name"]] = n
+
+        # ---- Create paths ----
+        path_rows = df[df["record_type"] == "path"]
+
+        for _, row in path_rows.iterrows():
+            p = path(
+                distance=int(row["length"]),
+                colour=row["color"],
+                path_id=row["path_id"]
+            )
+
+            start = node_lookup[row["source"]]
+            end = node_lookup[row["target"]]
+
+            p.nodes = [start, end]
+
+            start.add_path(p)
+            end.add_path(p)
+
+            self.add_path(p)
+
+    def add_node(self, node):
+        if node not in self.nodes:
+            self.nodes.append(node)
+        return node
+
+    def add_path(self, path):
+        self.paths.append(path)
+        self.add_node(path.nodes[0])
+        self.add_node(path.nodes[1])
+
+    def get_nodes(self):
+        return self.nodes
+
+    def get_paths(self):
+        return self.paths
+
+    def claim_path(self, path, player):
+        for p in self.paths:
+            if p.get_path_id() == path.get_path_id():
+                p.set_occupation(player)
+                return True 
+        return False
+
+class card:
+    def __init__(self, colour):
+        self.colour = colour
+
+    def get_colour(self):
+        return self.colour
+
+    def __repr__(self):
+        return f"card({self.colour})"
+
+class deck:
+    def __init__(self, colours=COLOURS, nbr_of_cards_per_colour=NBR_OF_CARDS_PER_COLOUR): 
+        self.cards = self.build_deck(colours, nbr_of_cards_per_colour)
+
+    def build_deck(self, colours, nbr_of_cards_per_colour):
+        cards = []
+        for colour in colours:
+            for i in range(nbr_of_cards_per_colour):
+                current_card = card(colour)
+                cards.append(current_card)
+        return cards
+
+    def shuffle(self):
+        self.deck = random.shuffle(self.cards)
+
+    def get_card_count(self): # Number of cards not stored, only counted when needed
+        return len(self.cards)
+
+    def get_colour_count(self, colour):
+        return sum(card.colour == colour for card in self.cards)
+
+def find_longest_possible_route(graph):
     """
-    Generic action in the simplified Ticket to Ride game.
+    Finds the longest shortest path in the graph, measured in number of paths (edges).
 
-    - type = "draw_card": no extra data needed (always draw top of deck).
-    - type = "claim_route": path_id identifies which path to claim.
+    What this means:
+    - For every pair of nodes in the graph, we imagine the shortest route between them,
+      where each traversed path counts as 1 step.
+    - Among all of those shortest routes, we find the one that is longest.
+    - This is the graph's "diameter" in terms of edge count.
+
+    Returns:
+        tuple:
+            (
+                longest_distance,   # int: number of paths in the longest shortest route
+                start_node,         # node: one endpoint
+                end_node            # node: the other endpoint
+            )
+
+    Algorithm used:
+    - For every start node, compute shortest path lengths to all other nodes.
+    - The helper _bfs_shortest_route_lengths(start_node, graph) now uses
+      shortest_route_between_two_nodes(node1, node2, graph) for each target node.
+
+    Time complexity:
+    - This version is simpler conceptually, but less efficient than one BFS from each node,
+      because it runs a BFS separately for each pair of nodes.
     """
-    type: ActionType
-    path_id: Optional[int] = None
 
-    @staticmethod
-    def draw_card() -> "Action":
-        return Action(type="draw_card")
+    # Edge case: empty graph
+    if not graph.nodes:
+        return (0, None, None)
 
-    @staticmethod
-    def claim_route(path_id: int) -> "Action":
-        return Action(type="claim_route", path_id=path_id)
+    longest_distance = -1
+    longest_start = None
+    longest_end = None
 
+    # Run "all target nodes from one start node"
+    for start_node in graph.nodes:
+        distances = _bfs_shortest_route_lengths(start_node, graph)
 
-# -------------------------
-# Player state
-# -------------------------
+        for end_node, distance in distances.items():
+            if distance > longest_distance and distance != float("inf"):
+                longest_distance = distance
+                longest_start = start_node
+                longest_end = end_node
 
-@dataclass
-class PlayerState:
+    return (longest_distance, longest_start, longest_end)
+
+def shortest_route_between_two_nodes(node1, node2, graph):
     """
-    Wraps the existing classes.player but adds explicit fields we care about
-    for search and evaluation.
+    Returns the shortest distance in number of edges between node1 and node2
+    using BFS.
 
-    For now we keep a reference to the underlying classes.player instance
-    to avoid breaking existing code.
+    Args:
+        node1: start node
+        node2: target node
+        graph: the graph containing the nodes
+
+    Returns:
+        int or float('inf'):
+            - shortest number of edges between node1 and node2
+            - float('inf') if node2 is unreachable from node1
     """
-    # Underlying domain object
-    obj: classes.player
 
-    # Convenience mirrors (kept in sync with obj where needed)
-    name: str
-    score: int = 0
-    trains: int = 44
-    # cards: list of classes.card or colour strings (you already use both)
-    cards: list = field(default_factory=list)
-    # route: destination ticket; for now keep your dict shape
-    # {"start": str, "end": str, "points": int}
-    route: Optional[dict] = None
+    if node1 not in graph.nodes or node2 not in graph.nodes:
+        return float("inf")
 
-    def sync_from_obj(self) -> None:
-        """
-        Synchronise from the underlying classes.player to this PlayerState.
-        Call this if legacy code mutates classes.player directly.
-        """
-        self.name = self.obj.name
-        self.score = self.obj.score
-        self.cards = list(self.obj.cards)
-        self.trains = self.obj.trains
-        self.route = self.obj.route
+    if node1 == node2:
+        return 0
 
-    def sync_to_obj(self) -> None:
-        """
-        Synchronise this PlayerState back into the underlying classes.player.
-        Call this after rules/engine functions update PlayerState.
-        """
-        self.obj.score = self.score
-        self.obj.cards = list(self.cards)
-        self.obj.trains = self.trains
-        self.obj.route = self.route
+    visited = set()
+    queue = deque([(node1, 0)])
+    visited.add(node1)
 
+    while queue:
+        current_node, distance = queue.popleft()
 
-# -------------------------
-# Game state
-# -------------------------
+        for p in current_node.get_connected_paths():
+            neighbor = (
+                p.get_end_node()
+                if p.get_start_node() == current_node
+                else p.get_start_node()
+            )
 
-@dataclass
-class GameState:
+            if neighbor not in graph.nodes or neighbor in visited:
+                continue
+
+            if neighbor == node2:
+                return distance + 1
+
+            visited.add(neighbor)
+            queue.append((neighbor, distance + 1))
+
+    return float("inf")
+
+def _bfs_shortest_route_lengths(start_node, graph):
     """
-    Full game state for the simplified Ticket to Ride model.
+    Returns the shortest number of edges from start_node to every node in graph.
 
-    This is the object that:
-      - rules.py will read/modify
-      - evaluation (U_s, E_s) will inspect
-      - search.py will copy and traverse
+    This keeps the same name/signature as before so other files do not need to change.
+    Internally, it now uses shortest_route_between_two_nodes(...) for each target node.
+
+    Returns:
+        dict[node, int]:
+            keys are nodes,
+            values are shortest distances in number of paths
     """
-    graph: classes.graph                 # static board (cities + paths)
-    players: List[PlayerState]           # two players: [human, AI] (by convention)
-    deck: classes.deck                   # remaining train cards
+    distances = {}
 
-    # Turn / phase
-    current_player_index: int = 0        # index into players
-    turn_number: int = 0                 # counts full turns or actions, as you prefer
+    for node in graph.nodes:
+        distances[node] = shortest_route_between_two_nodes(start_node, node, graph)
 
-    # Endgame bookkeeping
-    endgame_triggered: bool = False
-    endgame_trigger_player_index: Optional[int] = None
-    final_turns_remaining: int = 0       # e.g. 0 until endgame triggered
+    return distances
 
-    # Optional: cache for longest-path computations, etc.
-    longest_route_points: int = 10       # matches classes.game default
+def build_graph_of_player_from_node(node, player):
+    """
+    Builds a graph consisting only of paths claimed by the given player,
+    starting from the given node.
 
-    def current_player(self) -> PlayerState:
-        return self.players[self.current_player_index]
+    Returns:
+        graph: a new graph containing only the connected component
+        of player-owned paths reachable from the starting node.
+    """
 
-    def other_player(self) -> PlayerState:
-        # two-player game; the other is 1 - current
-        return self.players[1 - self.current_player_index]
+    player_graph = graph()
+    player_graph.add_node(node)
 
-    def copy_shallow(self) -> "GameState":
-        """
-        Shallow-ish copy suitable for search if you are careful not to
-        mutate shared objects in place. For a fully safe search you may
-        want a deeper copy strategy later.
-        """
-        return GameState(
-            graph=self.graph,                     # shared; board is mostly static
-            players=[p for p in self.players],    # shallow copy of list
-            deck=self.deck,                       # shared; rules must be careful
-            current_player_index=self.current_player_index,
-            turn_number=self.turn_number,
-            endgame_triggered=self.endgame_triggered,
-            endgame_trigger_player_index=self.endgame_trigger_player_index,
-            final_turns_remaining=self.final_turns_remaining,
-            longest_route_points=self.longest_route_points,
-        )
+    visited_nodes = set()
+    visited_paths = set()
+
+    queue = deque([node])
+
+    while queue:
+        current = queue.popleft()
+
+        if current in visited_nodes:
+            continue
+
+        visited_nodes.add(current)
+        player_graph.add_node(current)
+
+        for p in current.get_connected_paths():
+
+            # Only follow paths owned by the player
+            if p.get_occupation() != player.name:
+                continue
+
+            if p not in visited_paths:
+                visited_paths.add(p)
+                player_graph.add_path(p)
+
+            # Find the neighbor node
+            neighbor = (
+                p.get_end_node()
+                if p.get_start_node() == current
+                else p.get_start_node()
+            )
+
+            if neighbor not in visited_nodes:
+                queue.append(neighbor)
+
+    return player_graph
+
+def geographical_distance(node1, node2):
+    return abs(node1.longitude - node2.longitude) + abs(node1.latitude - node2.latitude)
+
+def find_shortest_connection_between_subgraphs(subgraph_a, subgraph_b):
+    """
+    Find the shortest way to connect two subgraphs using a multi-source BFS.
+
+    Idea:
+    - Start BFS from *all* nodes in subgraph A at once.
+    - Stop as soon as a node in subgraph B is reached.
+    - Use geographical distance to subgraph B only as a heuristic tie-breaker
+      when deciding which node at the same depth to expand first.
+
+    Important:
+    - Because depth (number of edges) is always the first priority,
+      this still returns a true shortest connection in edge count.
+    - The heuristic only affects which equally short candidate is explored first.
+
+    Args:
+        subgraph_a: subgraph A
+        subgraph_b: subgraph B
+
+    Returns:
+        dict with:
+            {
+                "distance": int,              # number of edges in shortest connection
+                "path_nodes": [node, ...],    # nodes from A-side to B-side
+                "path_edges": [path, ...],    # path objects along that route
+                "start_node": node,           # first node on route (in A)
+                "end_node": node              # first reached node in B
+            }
+
+        Returns None if no connection exists.
+
+        Special case:
+        - If the two subgraphs already overlap, returns distance 0.
+    """
+
+    a_nodes = set(subgraph_a.nodes)
+    b_nodes = set(subgraph_b.nodes)
+
+    if not a_nodes or not b_nodes:
+        return None
+
+    # If they already share a node, they are already connected.
+    overlap = a_nodes & b_nodes
+    if overlap:
+        shared = next(iter(overlap))
+        return {
+            "distance": 0,
+            "path_nodes": [shared],
+            "path_edges": [],
+            "start_node": shared,
+            "end_node": shared
+        }
+
+    def heuristic_distance_to_b(node):
+        """Minimum geographical distance from node to any node in subgraph B."""
+        return min(geographical_distance(node, target) for target in b_nodes)
+
+    # Priority queue entries:
+    # (depth, heuristic, tie_breaker, current_node)
+    #
+    # depth is first -> guarantees shortest path in number of edges
+    # heuristic is second -> chooses promising node among equal-depth candidates
+    frontier = []
+    counter = 0
+
+    # Parent maps for reconstructing the path
+    parent_node = {}
+    parent_edge = {}
+    best_depth = {}
+
+    for start in a_nodes:
+        best_depth[start] = 0
+        parent_node[start] = None
+        parent_edge[start] = None
+        heapq.heappush(frontier, (0, heuristic_distance_to_b(start), counter, start))
+        counter += 1
+
+    while frontier:
+        depth, _, _, current = heapq.heappop(frontier)
+
+        # Ignore stale queue entries
+        if depth != best_depth[current]:
+            continue
+
+        # Success: reached subgraph B
+        if current in b_nodes:
+            path_nodes = []
+            path_edges = []
+            node_cursor = current
+
+            while node_cursor is not None:
+                path_nodes.append(node_cursor)
+                edge_used = parent_edge[node_cursor]
+                if edge_used is not None:
+                    path_edges.append(edge_used)
+                node_cursor = parent_node[node_cursor]
+
+            path_nodes.reverse()
+            path_edges.reverse()
+
+            return {
+                "distance": len(path_edges),
+                "path_nodes": path_nodes,
+                "path_edges": path_edges,
+                "start_node": path_nodes[0],
+                "end_node": path_nodes[-1]
+            }
+
+        # Expand neighbors
+        for p in current.get_connected_paths():
+            neighbor = p.get_end_node() if p.get_start_node() == current else p.get_start_node()
+            new_depth = depth + 1
+
+            if neighbor not in best_depth or new_depth < best_depth[neighbor]:
+                best_depth[neighbor] = new_depth
+                parent_node[neighbor] = current
+                parent_edge[neighbor] = p
+
+                heapq.heappush(
+                    frontier,
+                    (new_depth, heuristic_distance_to_b(neighbor), counter, neighbor)
+                )
+                counter += 1
+
+    return 
+    
+def get_node_from_name(g, name):
+    """
+    Look up a node by its name in the given graph.
+    Returns the node or None if not found.
+    """
+    for node in g.nodes:
+        if name == node.name:
+            return node
+    return None
+
+
+def get_path_from_id(g, path_id):
+    """
+    Look up a path by its path_id in the given graph.
+    Returns the path or None if not found.
+    """
+    for p in g.paths:
+        if p.path_id == path_id:
+            return p
+    return None
+
+class player:
+    def __init__(self, name):
+        self.name = name
+        self.score = 0
+        self.cards = []
+        self.route = None # this is a route_card object
+        self.trains = 44
+        self.P_R = 21 # will be removed and only stored in self.route
+
+    def give_route(self):
+
+        # Apply random functions here sometime
+        start = "Brest"
+        end = "Petrograd"
+        points = 21
+        self.route = {
+            "start": start,
+            "end": end,
+            "points": points
+        }
+
+    def add_card_to_hand(self, card): 
+        self.cards.append(card) 
+
+    def draw_card(self, deck):
+        if deck.cards: 
+            card = deck.cards.pop(0) # remocves top card from deck
+            self.add_card_to_hand(card)
+        else: 
+            return False # No cards in deck
+    
+    def place_trains(self, path):
+        colour = path.colour
+        train_count = path.distance
+
+        matching_cards = [card for card in self.cards if card.colour == colour]
+
+        if len(matching_cards) < train_count:
+            return False
+
+        cards_to_remove = matching_cards[:train_count]
+        for card in cards_to_remove:
+            self.cards.remove(card)
+
+        path.occupation = self.name
+        self.trains -= train_count
+
+        return path
+    
+    def claim_path(self, path):
+        path.occupation = self.name
+
+    def __repr__(self):
+        return f"player({self.name})"
+
+
+class game:
+    def __init__(self, graph, players, deck, longest_route_points=10):
+        self.graph = graph
+        self.players = players
+        self.current_player = 0
+        self.current_round = 0
+        self.deck = deck
+        self.longest_route_points = longest_route_points
+
+        print("Game created successfully")
+        print(f"Nodes: {len(self.graph.get_nodes())}")
+        print(f"Paths: {len(self.graph.get_paths())}")
+        print(f"Players: {[player.name for player in self.players]}")
