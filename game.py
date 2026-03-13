@@ -1,6 +1,168 @@
-from collections import deque
-import classes
-import heapq
+import pandas as pd
+from collections import deque, Counter
+import random
+
+COLOURS = ["red", "blue", "green", "yellow", "black", "white", "orange", "pink"]
+NBR_OF_CARDS_PER_COLOUR = 12
+
+class node:
+    def __init__(self, name, longitude, latitude):
+        self.name = name
+        self.connected_paths = []
+        self.longitude = longitude
+        self.latitude = latitude
+
+    def add_path(self, path):
+        self.connected_paths.append(path)
+
+    def remove_path(self, path):
+        self.connected_paths.remove(path)
+
+    def get_connected_paths(self):
+        return self.connected_paths
+
+    def __repr__(self):
+        return f"node({self.name})"
+
+class path:
+    def __init__(self, distance, colour, path_id):
+        self.nodes = []
+        self.distance = int(distance)
+        self.colour = colour
+        self.occupation = None
+        self.path_id = path_id
+
+    def get_start_node(self):
+        return self.nodes[0]
+
+    def get_end_node(self):
+        return self.nodes[1]
+
+    def get_distance(self):
+        return self.distance
+
+    def get_colour(self):
+        return self.colour
+
+    def get_occupation(self):
+        return self.occupation
+
+    def set_occupation(self, player):
+        self.occupation = player.name
+
+    def get_path_id(self):
+        return self.path_id
+
+    def __repr__(self):
+        if len(self.nodes) == 2:
+            return f"path({self.nodes[0].name} <-> {self.nodes[1].name}, {self.distance}, {self.colour})"
+        return f"path(unconnected, {self.distance}, {self.colour})"
+
+class route_card:
+    def __init__(self, destinations, points):
+        self.destinations = destinations
+        self.points = points
+
+class graph:
+    def __init__(self):
+        self.nodes = []
+        self.paths = []
+
+    def import_graph(self, graph_file):
+        df = pd.read_csv(graph_file)
+
+        self.nodes = []
+        self.paths = []
+
+        node_lookup = {}
+
+        # ---- Create nodes ----
+        node_rows = df[df["record_type"] == "node"]
+
+        for _, row in node_rows.iterrows():
+            n = node(
+                name=row["name"],
+                longitude=float(row["longitude"]),
+                latitude=float(row["latitude"])
+            )
+            self.add_node(n)
+            node_lookup[row["name"]] = n
+
+        # ---- Create paths ----
+        path_rows = df[df["record_type"] == "path"]
+
+        for _, row in path_rows.iterrows():
+            p = path(
+                distance=int(row["length"]),
+                colour=row["color"],
+                path_id=row["path_id"]
+            )
+
+            start = node_lookup[row["source"]]
+            end = node_lookup[row["target"]]
+
+            p.nodes = [start, end]
+
+            start.add_path(p)
+            end.add_path(p)
+
+            self.add_path(p)
+
+    def add_node(self, node):
+        if node not in self.nodes:
+            self.nodes.append(node)
+        return node
+
+    def add_path(self, path):
+        self.paths.append(path)
+        self.add_node(path.nodes[0])
+        self.add_node(path.nodes[1])
+        # self.longest_possible_route = utils.find_longest_possible_route(self)
+        # self.N = self.longest_possible_route[0]
+
+    def get_nodes(self):
+        return self.nodes
+
+    def get_paths(self):
+        return self.paths
+
+    def claim_path(self, path, player):
+        for p in self.paths:
+            if p.get_path_id() == path.get_path_id():
+                p.set_occupation(player)
+                return True 
+        return False
+
+class card:
+    def __init__(self, colour):
+        self.colour = colour
+
+    def get_colour(self):
+        return self.colour
+
+    def __repr__(self):
+        return f"card({self.colour})"
+
+class deck:
+    def __init__(self, colours=COLOURS, nbr_of_cards_per_colour=NBR_OF_CARDS_PER_COLOUR): 
+        self.cards = self.build_deck(colours, nbr_of_cards_per_colour)
+
+    def build_deck(self, colours, nbr_of_cards_per_colour):
+        cards = []
+        for colour in colours:
+            for i in range(nbr_of_cards_per_colour):
+                current_card = card(colour)
+                cards.append(current_card)
+        return cards
+
+    def shuffle(self):
+        self.deck = random.shuffle(self.cards)
+
+    def get_card_count(self): # Number of cards not stored, only counted when needed
+        return len(self.cards)
+
+    def get_colour_count(self, colour):
+        return sum(card.colour == colour for card in self.cards)
 
 def find_longest_possible_route(graph):
     """
@@ -304,3 +466,5 @@ def get_path_from_id(graph, id):
         if id == path.name: return path
     return False  
 
+if __name__ == '__main__':
+    main()

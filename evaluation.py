@@ -1,8 +1,23 @@
+import utils
 from collections import deque
+import P_L
+import P_R
+import C_c
+from U_s import claimed_route_points
 
-# This file computes the terminal utility U(s) of a Ticket to Ride game state.
-# It evaluates the final score difference between AI and opponent based on claimed routes,
-# destination ticket completion, and longest path bonus.
+def E_s(game, player):
+
+    Delta_C_T = 0
+    for p in game.players:
+        if not p.name == player.name: # Compare name, player obj is not comparable
+            Delta_C_T += claimed_route_points(game.graph, p)
+
+    Evaluation = Delta_C_T
+               + P_L.P_L(game, player) * game.longest_route_points
+               + P_R.P_R(game, player) * player.route["points"]
+               + C_c.C_c(game, player)
+
+    return Evaluation
 
 import P_L
 def points_for_path_length(length):
