@@ -12,3 +12,6 @@ x Make P_colour(s) (Saskia)
 - Make P_opp(s, a) (Edda and Hakon)
 - Make main functions
 - Write about what we thought in playing the game and how that influenced our modelling
+- Make function legal actions(state) returns all legal actions as list of type action
+- Make function decide(state, actions)
+- FIX: gray is now a colour and no gray trains
