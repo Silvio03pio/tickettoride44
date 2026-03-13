@@ -4,6 +4,7 @@
 
 import P_colour
 
+
 def points_for_path_length(length):
     """
     Returns the standard Ticket to Ride score for a claimed path length.
@@ -54,6 +55,19 @@ def available_actions(graph):
     return actions
 
 
+def count_available_paths_per_colour(graph, colour):
+    """
+    Counts how many currently unclaimed paths exist for a given colour.
+    """
+    count = 0
+
+    for path in graph.get_paths():
+        if path.get_occupation() is None and path.get_colour() == colour:
+            count += 1
+
+    return count
+
+
 def delta_C_a(path):
     """
     Returns the immediate score gain of claiming a path.
@@ -71,34 +85,35 @@ def C_c(game, player):
     - % of action = probability of drawing the path colour from the deck
     - no. of trains in hand = number of cards of that colour currently in player's hand
 
-    Formula implemented:
-        C_c(s) = sum over available paths a of
-                 delta_C_a * P_colour(colour_of_a) * cards_in_hand(colour_of_a)
+    Normalized version:
+        each contribution is divided by the number of currently available
+        paths of the same colour, to keep the return value smaller and avoid
+        overweighting colours that simply appear more often on the board.
     """
     total = 0.0
 
     for path in available_actions(game.graph):
         colour = path.get_colour()
 
-        # Skip paths with undefined colours if ever present in the dataset
         if colour is None:
             continue
 
-        # Probability of drawing this colour from the remaining deck
-        # p_colour = game.deck.P_colour(colour) # old
-        p_colour = P_colour.P_colour(game.deck, colour) # new
-
-        # Number of cards of this colour currently in player's hand
+        p_colour = P_colour.P_colour(game.deck, colour)
         cards_in_hand = count_colour_in_player_hand(player, colour)
-
-        # Immediate route reward if this path is claimed
         delta = delta_C_a(path)
 
-        total += delta * p_colour * cards_in_hand
+        n_paths_same_colour = count_available_paths_per_colour(game.graph, colour)
+
+        if n_paths_same_colour > 0:
+            contribution = (delta * p_colour * cards_in_hand) / n_paths_same_colour
+        else:
+            contribution = 0
+
+        total += contribution
 
     return total
 
-# right now in the main this is comment
+
 def C_c_breakdown(game, player):
     """
     Returns a detailed breakdown of the C_c(s) contribution for debugging.
@@ -112,12 +127,16 @@ def C_c_breakdown(game, player):
         if colour is None:
             continue
 
-        # p_colour = game.deck.P_colour(colour) # old
-        p_colour = P_colour.P_colour(game.deck, colour) # new
+        p_colour = P_colour.P_colour(game.deck, colour)
         cards_in_hand = count_colour_in_player_hand(player, colour)
         delta = delta_C_a(path)
+        n_paths_same_colour = count_available_paths_per_colour(game.graph, colour)
 
-        contribution = delta * p_colour * cards_in_hand
+        if n_paths_same_colour > 0:
+            contribution = (delta * p_colour * cards_in_hand) / n_paths_same_colour
+        else:
+            contribution = 0
+
         total += contribution
 
         breakdown.append({
@@ -129,6 +148,7 @@ def C_c_breakdown(game, player):
             "delta_C_a": delta,
             "P_colour": p_colour,
             "cards_in_hand": cards_in_hand,
+            "available_paths_same_colour": n_paths_same_colour,
             "contribution": contribution
         })
 

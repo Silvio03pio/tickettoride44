@@ -303,3 +303,4 @@ def get_path_from_id(graph, id):
     for path in graph.nodes:
         if id == path.name: return path
     return False  
+
