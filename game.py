@@ -1,6 +1,7 @@
 import pandas as pd
-from collections import deque, Counter
+from collections import deque
 import random
+import heapq
 
 COLOURS = ["red", "blue", "green", "yellow", "black", "white", "orange", "pink"]
 NBR_OF_CARDS_PER_COLOUR = 12
@@ -117,8 +118,6 @@ class graph:
         self.paths.append(path)
         self.add_node(path.nodes[0])
         self.add_node(path.nodes[1])
-        # self.longest_possible_route = utils.find_longest_possible_route(self)
-        # self.N = self.longest_possible_route[0]
 
     def get_nodes(self):
         return self.nodes
@@ -284,11 +283,11 @@ def build_graph_of_player_from_node(node, player):
     starting from the given node.
 
     Returns:
-        classes.graph: a new graph containing only the connected component
+        graph: a new graph containing only the connected component
         of player-owned paths reachable from the starting node.
     """
 
-    player_graph = classes.graph()
+    player_graph = graph()
     player_graph.add_node(node)
 
     visited_nodes = set()
@@ -456,15 +455,23 @@ def find_shortest_connection_between_subgraphs(subgraph_a, subgraph_b):
 
     return 
     
-def get_node_from_name(graph, name):
-    for node in graph.nodes:
-        if name == node.name: return node
-    return False
+def get_node_from_name(g, name):
+    """
+    Look up a node by its name in the given graph.
+    Returns the node or None if not found.
+    """
+    for node in g.nodes:
+        if name == node.name:
+            return node
+    return None
 
-def get_path_from_id(graph, id):
-    for path in graph.nodes:
-        if id == path.name: return path
-    return False  
 
-if __name__ == '__main__':
-    main()
+def get_path_from_id(g, path_id):
+    """
+    Look up a path by its path_id in the given graph.
+    Returns the path or None if not found.
+    """
+    for p in g.paths:
+        if p.path_id == path_id:
+            return p
+    return None

@@ -1,52 +1,49 @@
-import classes
-import utils
-import P_R
-import P_L
-import P_colour
-import U_s
-import C_c
+import game
+import state
+import models_P
+import evaluation
 
 def main(): 
 
     # Graph - Map
-    game_graph = classes.graph()
+    game_graph = game.graph()
     game_graph.import_graph("ttr_europe_map_data.csv")
 
     # Players
-    player1 = classes.player("human")
-    player2 = classes.player("AI")
+    player1 = state.player("human")
+    player2 = state.player("AI")
     players = [player1, player2]
 
     # Deck of train cards
-    deck = classes.deck()
+    deck = game.deck()
 
     # Create game
-    game = classes.game(game_graph, players, deck)
+    current_game = state.game(game_graph, players, deck)
 
 
     # ---------------------------------- TEST ----------------------------------
 
 
-    #Test for P_L
+    # Test for P_L
     print("\n--- P_LONGEST PATH TEST ---")
-    player2.claim_path(game.graph.paths[10])
-    player2.claim_path(game.graph.paths[11])
-    ai_longest = P_L._longest_chain_for_player(game.graph, player2)
-    opp_longest = P_L._longest_chain_for_player(game.graph, player1)
-    Pl = P_L.P_L(game, player2)
+    player2.claim_path(current_game.graph.paths[10])
+    player2.claim_path(current_game.graph.paths[11])
+    ai_longest = models_P._longest_chain_for_player(current_game.graph, player2)
+    opp_longest = models_P._longest_chain_for_player(current_game.graph, player1)
+    Pl = models_P.P_L(current_game, player2)
     print(f"AI longest: {ai_longest}")
     print(f"Human longest: {opp_longest}")
     print(f"Probability of winning longest path bonus: {Pl}")
 
     # P_colour 
     print("\n--- P_COLOUR TEST ---")
-    prop = P_colour.P_colour(game.deck, "blue")
+    prop = models_P.P_colour(current_game.deck, "blue")
     print(f"Propability of blue: {prop}")
-    game.deck.shuffle()
+    current_game.deck.shuffle()
     for i in range(10): # draw 10 cards from deck
-        player1.draw_card(game.deck)
+        player1.draw_card(current_game.deck)
     print(f"Player 1 cards: {player1.cards}")
-    prop = P_colour.P_colour(game.deck, "blue")
+    prop = models_P.P_colour(current_game.deck, "blue")
     print(f"probability of blue now: {prop}")
     
     """
@@ -64,7 +61,7 @@ def main():
     """
         
     # Utility U(s) test
-    breakdown = U_s.utility_breakdown(game, player2, player1)
+    breakdown = evaluation.utility_breakdown(current_game, player2, player1)
 
     print("\n--- TERMINAL UTILITY BREAKDOWN ---")
     print("AI route points:", breakdown["AI"]["route_points"])
@@ -89,8 +86,8 @@ def main():
         classes.card("green")
     ]
 
-    cc_value = C_c.C_c(game, player2)
-    cc_breakdown = C_c.C_c_breakdown(game, player2)
+    cc_value = models_P.C_c(current_game, player2)
+    cc_breakdown = models_P.C_c_breakdown(current_game, player2)
 
     print("\n--- C_c(s) TEST ---")
     print("C_c(s) =", cc_value)

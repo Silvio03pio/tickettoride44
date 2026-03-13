@@ -1,25 +1,33 @@
-import utils
 from collections import deque
-import P_L
-import P_R
-import C_c
-from U_s import claimed_route_points
+
 
 def E_s(game, player):
+    """
+    Non-terminal evaluation function E(s) for a given player.
 
+    Uses:
+      - claimed_route_points from this module
+      - P_L, P_R, C_c from models_P (imported lazily to avoid circular imports)
+    """
+    # Import here to avoid circular import at module load time
+    import models_P
+
+    # Sum of opponents' claimed route points
     Delta_C_T = 0
     for p in game.players:
-        if not p.name == player.name: # Compare name, player obj is not comparable
+        if p.name != player.name:
             Delta_C_T += claimed_route_points(game.graph, p)
 
-    Evaluation = Delta_C_T
-               + P_L.P_L(game, player) * game.longest_route_points
-               + P_R.P_R(game, player) * player.route["points"]
-               + C_c.C_c(game, player)
+    evaluation = (
+        Delta_C_T
+        + models_P.P_L(game, player) * game.longest_route_points
+        + models_P.P_R(game, player) * player.route["points"]
+        + models_P.C_c(game, player)
+    )
 
-    return Evaluation
+    return evaluation
 
-import P_L
+
 def points_for_path_length(length):
     """
     Returns the number of points awarded for claiming a route

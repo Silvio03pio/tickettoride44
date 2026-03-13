@@ -1,5 +1,4 @@
-import game 
-import evaluation
+import game
 
 def points_for_path_length(length):
     """
@@ -163,6 +162,10 @@ def P_colour(deck, colour):
     return numerator / denominator
 #Returns {colour: probability} for all 8 colours.
 def all_probabilities(deck):
+    """
+    Returns a dict {colour: probability} for all standard colours.
+    """
+    from game import COLOURS  # imported here to avoid circular import at module load
     return {colour: P_colour(deck, colour) for colour in COLOURS}
 
 def P_L(game, player):
@@ -210,7 +213,7 @@ def _longest_chain_for_player(full_graph, player):
         if node in visited_nodes:
             continue  # already part of a previously computed component
 
-        component = utils.build_graph_of_player_from_node(node, player)
+        component = game.build_graph_of_player_from_node(node, player)
 
         # Mark every node in this component so we don't reprocess it
         visited_nodes.update(component.nodes)
@@ -218,23 +221,25 @@ def _longest_chain_for_player(full_graph, player):
         if not component.paths:
             continue  # node has no claimed edges — nothing to measure
 
-        chain_length = utils.find_longest_possible_route(component)[0] 
+        chain_length = game.find_longest_possible_route(component)[0]
         if chain_length > longest:
             longest = chain_length
 
     return longest
 
 def P_R(game, player):
+    """
+    Route-completion related term P_R(s) for the given player.
+    """
+    start_node = game.get_node_from_name(game.graph, player.route["start"])
+    end_node = game.get_node_from_name(game.graph, player.route["end"])
+    start_graph = game.build_graph_of_player_from_node(start_node, player)
+    end_graph = game.build_graph_of_player_from_node(end_node, player)
 
-    start_node = utils.get_node_from_name(game.graph, player.route["start"])
-    end_node = utils.get_node_from_name(game.graph, player.route["end"])
-    start_graph = utils.build_graph_of_player_from_node(start_node, player)
-    end_graph = utils.build_graph_of_player_from_node(end_node, player)
-
-    shortest_connection = utils.find_shortest_connection_between_subgraphs(start_graph, end_graph)
+    shortest_connection = game.find_shortest_connection_between_subgraphs(start_graph, end_graph)
     shortest_connection_length = shortest_connection["distance"]
 
-    longest_possible = utils.find_longest_possible_route(game.graph)
+    longest_possible = game.find_longest_possible_route(game.graph)
     longest_possible_length = longest_possible[0]
 
     # To match with word file
