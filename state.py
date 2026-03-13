@@ -1,119 +1,137 @@
+# state.py
+
 from dataclasses import dataclass, field
 from typing import List, Optional, Literal
-import pandas as pd
-from collections import deque, Counter
-import random
 
-import classes # Uses graph, player, deck, route_card as defined there
-
-#___________________________________
-# Action Representation
-#___________________________________
-
-# Define a class Action that lets a player draw or claim a route
+import classes  # uses graph, player, deck, route_card as defined there
 
 
+# -------------------------
+# Action representation
+# -------------------------
 
-#___________________________________
-# Player State
-#___________________________________
-
-# Define a class PlayerState to track their cards on hand, ticket, and trains left (search and evaluation will use this)
-
+ActionType = Literal["draw_card", "claim_route"]
 
 
+@dataclass(frozen=True)
+class Action:
+    """
+    Generic action in the simplified Ticket to Ride game.
 
-#___________________________________
-# Game State
-#___________________________________
+    - type = "draw_card": no extra data needed (always draw top of deck).
+    - type = "claim_route": path_id identifies which path to claim.
+    """
+    type: ActionType
+    path_id: Optional[int] = None
 
-# Define a class GameState to track the game state (rules, evaluation, and search will use this)
+    @staticmethod
+    def draw_card() -> "Action":
+        return Action(type="draw_card")
 
-
-class player:
-    def __init__(self, name):
-        self.name = name
-        self.score = 0
-        self.cards = []
-        self.route = None # this is a route_card object
-        self.trains = 44
-        self.P_R = 21 # will be removed and only stored in self.route
-
-    def give_route(self):
-
-        # Apply random functions here sometime
-        start = "Brest"
-        end = "Petrograd"
-        points = 21
-        self.route = {
-            "start": start,
-            "end": end,
-            "points": points
-        }
-
-    def add_card_to_hand(self, card): 
-        self.cards.append(card) 
-
-    def draw_card(self, deck):
-        if deck.cards: 
-            card = deck.cards.pop(0) # remocves top card from deck
-            self.add_card_to_hand(card)
-        else: 
-            return False # No cards in deck
-    
-    def place_trains(self, path):
-        colour = path.colour
-        train_count = path.distance
-
-        matching_cards = [card for card in self.cards if card.colour == colour]
-
-        if len(matching_cards) < train_count:
-            return False
-
-        cards_to_remove = matching_cards[:train_count]
-        for card in cards_to_remove:
-            self.cards.remove(card)
-
-        path.occupation = self.name
-        self.trains -= train_count
-
-        return path
-    
-    def claim_path(self, path):
-        path.occupation = self.name
-
-    def __repr__(self):
-        return f"player({self.name})"
+    @staticmethod
+    def claim_route(path_id: int) -> "Action":
+        return Action(type="claim_route", path_id=path_id)
 
 
-class game:
-    def __init__(self, graph, players, deck, longest_route_points=10):
-        self.graph = graph
-        self.players = players
-        self.current_player = 0
-        self.current_round = 0
-        self.deck = deck
-        self.longest_route_points = longest_route_points
+# -------------------------
+# Player state
+# -------------------------
 
-        print("Game created successfully")
-        print(f"Nodes: {len(self.graph.get_nodes())}")
-        print(f"Paths: {len(self.graph.get_paths())}")
-        print(f"Players: {[player.name for player in self.players]}")
+@dataclass
+class PlayerState:
+    """
+    Wraps the existing classes.player but adds explicit fields we care about
+    for search and evaluation.
 
-# For testing purposes
+    For now we keep a reference to the underlying classes.player instance
+    to avoid breaking existing code.
+    """
+    # Underlying domain object
+    obj: classes.player
 
-def main():
-    test_graph = graph()
-    test_graph.import_graph("ttr_europe_map_data.csv")
+    # Convenience mirrors (kept in sync with obj where needed)
+    name: str
+    score: int = 0
+    trains: int = 44
+    # cards: list of classes.card or colour strings (you already use both)
+    cards: list = field(default_factory=list)
+    # route: destination ticket; for now keep your dict shape
+    # {"start": str, "end": str, "points": int}
+    route: Optional[dict] = None
 
-    print("Nodes:")
-    print(test_graph.get_nodes())
+    def sync_from_obj(self) -> None:
+        """
+        Synchronise from the underlying classes.player to this PlayerState.
+        Call this if legacy code mutates classes.player directly.
+        """
+        self.name = self.obj.name
+        self.score = self.obj.score
+        self.cards = list(self.obj.cards)
+        self.trains = self.obj.trains
+        self.route = self.obj.route
 
-    print("\nPaths:")
-    print(test_graph.get_paths()[:10])  # print first 10 paths
+    def sync_to_obj(self) -> None:
+        """
+        Synchronise this PlayerState back into the underlying classes.player.
+        Call this after rules/engine functions update PlayerState.
+        """
+        self.obj.score = self.score
+        self.obj.cards = list(self.cards)
+        self.obj.trains = self.trains
+        self.obj.route = self.route
 
-    print("\nN:")
-    print(test_graph.N)
 
-if __name__ == '__main__':
-    main()
+# -------------------------
+# Game state
+# -------------------------
+
+@dataclass
+class GameState:
+    """
+    Full game state for the simplified Ticket to Ride model.
+
+    This is the object that:
+      - rules.py will read/modify
+      - evaluation (U_s, E_s) will inspect
+      - search.py will copy and traverse
+    """
+    graph: classes.graph                 # static board (cities + paths)
+    players: List[PlayerState]           # two players: [human, AI] (by convention)
+    deck: classes.deck                   # remaining train cards
+
+    # Turn / phase
+    current_player_index: int = 0        # index into players
+    turn_number: int = 0                 # counts full turns or actions, as you prefer
+
+    # Endgame bookkeeping
+    endgame_triggered: bool = False
+    endgame_trigger_player_index: Optional[int] = None
+    final_turns_remaining: int = 0       # e.g. 0 until endgame triggered
+
+    # Optional: cache for longest-path computations, etc.
+    longest_route_points: int = 10       # matches classes.game default
+
+    def current_player(self) -> PlayerState:
+        return self.players[self.current_player_index]
+
+    def other_player(self) -> PlayerState:
+        # two-player game; the other is 1 - current
+        return self.players[1 - self.current_player_index]
+
+    def copy_shallow(self) -> "GameState":
+        """
+        Shallow-ish copy suitable for search if you are careful not to
+        mutate shared objects in place. For a fully safe search you may
+        want a deeper copy strategy later.
+        """
+        return GameState(
+            graph=self.graph,                     # shared; board is mostly static
+            players=[p for p in self.players],    # shallow copy of list
+            deck=self.deck,                       # shared; rules must be careful
+            current_player_index=self.current_player_index,
+            turn_number=self.turn_number,
+            endgame_triggered=self.endgame_triggered,
+            endgame_trigger_player_index=self.endgame_trigger_player_index,
+            final_turns_remaining=self.final_turns_remaining,
+            longest_route_points=self.longest_route_points,
+        )
