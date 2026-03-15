@@ -5,14 +5,14 @@
 # 4. Deprecate or thin out: player.place_trains, player.draw_card, player.claim_path so they become light wrappers (or remove once all call sites are updated)
 
 from dataclasses import dataclass
-from pyarrow import large_list_view
 import state
+from game import path
 
 
 @dataclass
 class action():
-    type: str # "d" or "c"
-    path: path = None # None by default if d, claimed path if c
+    type: str  # "d" = draw, "c" = claim
+    path: path = None  # None if draw; the path to claim if type "c"
 
 def claim(state, path):
     colour = path.colour
@@ -27,6 +27,7 @@ def claim(state, path):
     cards_to_remove = matching_cards[:train_count]
     for card in cards_to_remove:
         state.current_player.cards.remove(card)
+    state.discard.extend(cards_to_remove)
 
     path.occupation = state.current_player.name
     state.current_player.trains -= train_count
@@ -41,7 +42,6 @@ def draw(state):
         return False # No cards in deck
 
 def apply_action(action, state):
-    state.current_player = state.players[state.current_round % len(state.players)]
     if action.type == "d":
         draw(state)
     elif action.type == "c":
@@ -49,6 +49,7 @@ def apply_action(action, state):
     else:
         print("ERRRRR")
         return False
+    state.current_round += 1
 
 
 
