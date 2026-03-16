@@ -6,6 +6,34 @@ import heapq
 COLOURS = ["red", "blue", "green", "yellow", "black", "white", "orange", "pink"]
 NBR_OF_CARDS_PER_COLOUR = 12
 
+class player:
+    def __init__(self, name, type):
+        self.name = name
+        self.type = type
+        self.score = 0
+        self.cards = []
+        self.route = None # this is a route_card object
+        self.trains = 10
+        self.end_game = False
+
+    def give_route(self):
+
+        # Apply random functions here sometime
+        start = "Brest"
+        end = "Petrograd"
+        points = 21
+        self.route = {
+            "start": start,
+            "end": end,
+            "points": points
+        }
+
+    def add_card_to_hand(self, card): 
+        self.cards.append(card) 
+
+    def __repr__(self):
+        return f"player({self.name})"
+
 class node:
     def __init__(self, name, longitude, latitude):
         self.name = name
@@ -56,7 +84,7 @@ class path:
 
     def __repr__(self):
         if len(self.nodes) == 2:
-            return f"path({self.nodes[0].name} <-> {self.nodes[1].name}, {self.distance}, {self.colour})"
+            return f"path({self.path_id}: {self.nodes[0].name} <-> {self.nodes[1].name}, {self.distance}, {self.colour})\n"
         return f"path(unconnected, {self.distance}, {self.colour})"
 
 class route_card:
@@ -465,7 +493,6 @@ def get_node_from_name(g, name):
             return node
     return None
 
-
 def get_path_from_id(g, path_id):
     """
     Look up a path by its path_id in the given graph.
@@ -475,31 +502,3 @@ def get_path_from_id(g, path_id):
         if p.path_id == path_id:
             return p
     return None
-
-class player:
-    def __init__(self, name):
-        self.name = name
-        self.score = 0
-        self.cards = []
-        self.route = None # this is a route_card object
-        self.trains = 44
-        self.P_R = 21 # will be removed and only stored in self.route
-
-    def give_route(self):
-
-        # Apply random functions here sometime
-        start = "Brest"
-        end = "Petrograd"
-        points = 21
-        self.route = {
-            "start": start,
-            "end": end,
-            "points": points
-        }
-
-    def add_card_to_hand(self, card): 
-        self.cards.append(card) 
-
-    def __repr__(self):
-        return f"player({self.name})"
-
