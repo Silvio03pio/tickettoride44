@@ -3,13 +3,7 @@ import os
 
 import game
 import rules
-<<<<<<< HEAD
-import models_P
-import evaluation
-import state_show
-=======
 import state
->>>>>>> 47f9c8f2f89988499dbe328fb82fd6674f2996bd
 
 def main(): 
 
