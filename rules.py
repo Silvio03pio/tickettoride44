@@ -53,7 +53,7 @@ def apply_action(state, action):
         return False
     state.current_round += 1
 
-def get_all_possible_actions(state):
+def legal_actions(state):
     possible_actions = []
 
     # Always possible to draw card
@@ -79,7 +79,7 @@ def get_all_possible_actions(state):
 
 def human_decide_action(state):
 
-    all_possible_actions = get_all_possible_actions(state)
+    all_possible_actions = legal_actions(state)
     selected_path = None
 
     while True:

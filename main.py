@@ -31,7 +31,7 @@ def main():
         print("\nCARDS IN HAND:")
         print(in_hand, "\n")
 
-        all_possible = rules.get_all_possible_actions(test_game)
+        all_possible = rules.legal_actions(test_game)
         print("ALL POSSIBLE:")
         print(all_possible, "\n")
 
