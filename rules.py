@@ -9,7 +9,7 @@ from game import path as Path
 class Action:
     """
     Lightweight action representation.
-    type: \"d\" (draw) or \"c\" (claim).
+    type: \"d\" (draw), \"c\" (claim), or \"q\" (quit/end early).
     """
     type: str
     path: Path = None  # None if draw; the path to claim if type \"c\"
@@ -31,10 +31,11 @@ def claim_route(state, path):
 
     path.occupation = player.name
     player.trains -= train_count
-    # Endgame trigger: once any player hits <= 2 trains, start final-turn countdown.
+    # Endgame trigger: once any player hits <= 2 trains, every other player gets one final turn.
+    # (Closest to standard Ticket to Ride, and avoids giving the trigger player an extra turn.)
     if (not state.endgame_triggered) and player.trains <= 2:
         state.endgame_triggered = True
-        state.final_turns_remaining = len(state.players)
+        state.final_turns_remaining = max(0, len(state.players) - 1)
 
     return path
 
@@ -48,8 +49,15 @@ def draw_card(state):
 
 def apply_action(state, action):
     """Apply one action for the current player and advance the turn counter."""
+    if action.type == "q":
+        state.terminal = True
+        state.terminal_reason = "quit"
+        return True
     if action.type == "d":
-        draw_card(state)
+        ok = draw_card(state)
+        if ok is False:
+            state.terminal = True
+            state.terminal_reason = "deck_empty"
     elif action.type == "c":
         claim_route(state, action.path)
     else:
@@ -57,10 +65,17 @@ def apply_action(state, action):
     state.current_round += 1
     if state.endgame_triggered:
         state.final_turns_remaining = max(0, state.final_turns_remaining - 1)
+        if state.final_turns_remaining == 0:
+            state.terminal = True
+            state.terminal_reason = "endgame"
     return True
 
 def legal_actions(state):
     possible_actions = []
+
+    # Allow manual early-ending only for a human player (AI should always play to completion).
+    if state.current_player.type == "human":
+        possible_actions.append(Action("q"))
 
     # Draw is only legal if deck non-empty
     if state.deck.get_card_count() > 0:
@@ -89,20 +104,49 @@ def legal_actions(state):
 def human_decide_action(state):
 
     all_possible_actions = legal_actions(state)
-    selected_path = None
+    claimable = [a for a in all_possible_actions if a.type == "c" and a.path is not None]
 
     while True:
-        d_or_c = input("Choose action: (d)raw or (c)laim: ").strip().lower()
-        if d_or_c == "c":
-            selected_path_id = input("Enter path id to claim: ").strip()
-            selected_path = game.get_path_from_id(state.graph, selected_path_id)
-        chosen_action = Action(d_or_c, selected_path)
-        if chosen_action in all_possible_actions:
-            print(f"action {chosen_action} valid")
-            return chosen_action
-        else:
-            print("Invalid action. Type 'd' to draw or 'c' to claim.")
-            print("Make sure the path you claim is available")
+        choice = input("Choose action: (d)raw, (c)laim, or (q)uit: ").strip().lower()
+
+        if choice == "d":
+            if any(a.type == "d" for a in all_possible_actions):
+                return Action("d")
+            print("You cannot draw (deck is empty).")
+            continue
+
+        if choice == "q":
+            if any(a.type == "q" for a in all_possible_actions):
+                return Action("q")
+            print("Quit is not available.")
+            continue
+
+        if choice == "c":
+            if not claimable:
+                print("You cannot claim any route right now (need enough cards and trains).")
+                continue
+
+            print("Claimable paths:")
+            for a in claimable:
+                p = a.path
+                start = p.get_start_node().name
+                end = p.get_end_node().name
+                print(f"- {p.path_id}: {start} <-> {end} | len {p.distance} | {p.colour}")
+
+            selected_path_id = input("Enter path id to claim (e.g. R015): ").strip()
+            selected_path = game.get_path_from_id(state.graph, selected_path_id.upper())
+            if selected_path is None:
+                print("Unknown path id. Try again.")
+                continue
+
+            # Validate against currently claimable set (avoids object-equality surprises)
+            if any(a.path is selected_path for a in claimable):
+                return Action("c", selected_path)
+
+            print("That path is not currently claimable (occupied or insufficient cards/trains).")
+            continue
+
+        print("Invalid input. Please type d, c, or q.")
 
 def decide_action(state):
     """
@@ -127,7 +171,7 @@ def decide_action(state):
 
 def is_terminal(state):
     """Terminal condition for the simplified endgame scaffolding."""
-    return state.endgame_triggered and state.final_turns_remaining == 0
+    return bool(state.terminal)
 
 
 # Backwards-compatible aliases for older names used in notebooks/experiments.

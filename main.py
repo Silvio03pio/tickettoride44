@@ -1,54 +1,138 @@
 
 import os
+import csv
+import random
 
 import game
 import rules
 import state
+import evaluation
 
-def main(): 
+def _here_path(filename):
+    return os.path.join(os.path.dirname(__file__), filename)
+
+
+def _count_hand_by_colour(cards):
+    counts = {c: 0 for c in game.COLOURS}
+    for card in cards:
+        colour = card.colour if hasattr(card, "colour") else card.get_colour()
+        if colour in counts:
+            counts[colour] += 1
+    return counts
+
+
+def _format_hand(cards):
+    counts = _count_hand_by_colour(cards)
+    parts = [f"{c}:{n}" for c, n in counts.items() if n > 0]
+    return "  ".join(parts) if parts else "(empty)"
+
+
+def _load_route_tickets(csv_path):
+    tickets = []
+    with open(csv_path, newline="", encoding="utf-8") as f:
+        reader = csv.DictReader(f)
+        for row in reader:
+            tickets.append({"start": row["city_a"], "end": row["city_b"], "points": int(row["points"])})
+    return tickets
+
+
+def _deal_starting_hands(game_state, cards_each=4):
+    for _ in range(cards_each):
+        for p in game_state.players:
+            if not game_state.deck.cards:
+                game_state.terminal = True
+                game_state.terminal_reason = "deck_empty"
+                return
+            p.cards.append(game_state.deck.cards.pop(0))
+
+
+def _print_turn_header(game_state):
+    p = game_state.current_player
+    print("\n" + "=" * 72)
+    print(f"Turn {game_state.current_round} | Current player: {p.name} ({p.type})")
+    print("-" * 72)
+    print(f"Score: {p.score} | Trains left: {p.trains}")
+    if p.route is not None:
+        print(f"Ticket: {p.route['start']} -> {p.route['end']} ({p.route['points']} pts)")
+    else:
+        print("Ticket: (none)")
+    print(f"Hand: {_format_hand(p.cards)}")
+    print("=" * 72)
+
+
+def _print_actions(game_state, actions):
+    print("Available actions:")
+    for a in actions:
+        if a.type == "q":
+            print("- q: Quit / end the game now (final scoring immediately)")
+        elif a.type == "d":
+            print("- d: Draw 1 train card from the deck")
+        elif a.type == "c" and a.path is not None:
+            path = a.path
+            start = path.get_start_node().name
+            end = path.get_end_node().name
+            print(f"- c: Claim path {path.path_id} | {start} <-> {end} | len {path.distance} | {path.colour}")
+
+
+def _print_final_scoring(game_state, ai_index=0):
+    ai = game_state.players[ai_index]
+    opp = game_state.players[1 - ai_index]
+    breakdown = evaluation.utility_breakdown(game_state, ai, opp, longest_bonus=game_state.longest_route_points)
+
+    print("\n" + "#" * 72)
+    print("FINAL SCORING")
+    print(f"Terminal reason: {game_state.terminal_reason}")
+    print("-" * 72)
+    print(f"{ai.name} total: {breakdown['AI']['total']} (routes {breakdown['AI']['route_points']}, ticket {breakdown['AI']['ticket_points']}, longest {breakdown['AI']['longest_bonus']})")
+    print(f"{opp.name} total: {breakdown['Opponent']['total']} (routes {breakdown['Opponent']['route_points']}, ticket {breakdown['Opponent']['ticket_points']}, longest {breakdown['Opponent']['longest_bonus']})")
+    print("-" * 72)
+    print(f"Utility U(s) = {breakdown['utility']}  (AI - Opponent)")
+    print("#" * 72 + "\n")
+
+
+def main():
+
+    random.seed()
 
     test_graph = game.graph()
-    here = os.path.dirname(__file__)
-    map_path = os.path.join(here, "ttr_europe_map_data.csv")
-    test_graph.import_graph(map_path)
+    test_graph.import_graph(_here_path("ttr_europe_map_data.csv"))
 
-    # Two-player simplified setup: one human, one AI (AI policy not implemented yet).
+    # Two-player simplified setup: one AI placeholder (random) and one human.
+    player_ai = game.player("AI", "random")  # placeholder until MCTS
     player_human = game.player("Human", "human")
-    player_ai = game.player("AI", "human")  # placeholder until search.py is implemented
     players = [player_ai, player_human]
+
+    # Defensive reset: ensures a fresh start even if this file is run multiple times
+    # in the same Python process / interactive session.
+    for p in players:
+        p.cards = []
+        p.route = None
+        p.score = 0
+        p.trains = 44
 
     deck_of_trains = game.deck()
     deck_of_trains.shuffle()
 
     test_game = state.state(test_graph, players, deck_of_trains)
-    # Give each player one destination ticket (currently a placeholder ticket generator).
-    for p in test_game.players:
-        p.give_route()
+
+    # Destination tickets: 1 per player, secret (we only show current player's ticket in terminal).
+    tickets = _load_route_tickets(_here_path("route_cards.csv"))
+    random.shuffle(tickets)
+    for i, p in enumerate(test_game.players):
+        # Copy dict so it can't be shared/mutated across players/runs
+        p.route = dict(tickets[i % len(tickets)])
+
+    # Initial hands: empty (per simplified rules). Players must draw to get cards.
 
 
-    while True:
-        if rules.is_terminal(test_game):
-            break
-        print(f"----------------------------- {test_game.current_round}: {test_game.current_player} -----------------------------")
-        
-        in_hand = test_game.current_player.cards
-        print("\nCARDS IN HAND:")
-        print(in_hand, "\n")
-
-        all_possible = rules.legal_actions(test_game)
-        print("ALL POSSIBLE:")
-        print(all_possible, "\n")
-
-        print("Number of trains left", test_game.current_player.trains)
- 
+    while not rules.is_terminal(test_game):
+        _print_turn_header(test_game)
+        actions = rules.legal_actions(test_game)
+        _print_actions(test_game, actions)
         chosen_action = rules.decide_action(test_game)
         rules.apply_action(test_game, chosen_action)
 
-    print("Game ended (endgame terminal condition reached).")
-
-
-
-    
+    _print_final_scoring(test_game, ai_index=0)
 
 
 if __name__ == "__main__":

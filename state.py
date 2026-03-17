@@ -19,6 +19,9 @@ class state:
         self.discard = []  # cards spent when claiming routes (visible to all; order irrelevant)
         self.endgame_triggered = False
         self.final_turns_remaining = 0
+        # Explicit terminal flags (supports early manual ending)
+        self.terminal = False
+        self.terminal_reason = None  # e.g. "endgame", "quit", "deck_empty"
 
     @property
     def current_player(self):
@@ -54,6 +57,8 @@ class _ObservableForAI:
         self.graph = full_state.graph
         self.current_round = full_state.current_round
         self.current_player_index = full_state.current_round % len(full_state.players)
+        self.terminal = full_state.terminal
+        self.terminal_reason = full_state.terminal_reason
 
         # AI's own full info (hand, ticket, score, trains)
         self.ai_player = full_state.players[ai_player_index]
