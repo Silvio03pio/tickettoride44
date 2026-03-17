@@ -53,7 +53,6 @@ def apply_action(state, action):
         return False
     state.current_round += 1
 
-
 def get_all_possible_actions(state):
     possible_actions = []
 
@@ -98,10 +97,13 @@ def human_decide_action(state):
 
 # def monte_carlo_decide_action(state):
 
-
 def decide_action(state):
 
     player = state.current_player
 
     if player.type == "human":
         return human_decide_action(state)
+    """
+    if player.type == "monte_carlo":
+        return monte_carlo_decide_action(state)
+    """
