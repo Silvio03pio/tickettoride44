@@ -1,46 +1,56 @@
 
-import state
+import os
+
 import game
 import rules
+<<<<<<< HEAD
 import models_P
 import evaluation
 import state_show
+=======
+import state
+>>>>>>> 47f9c8f2f89988499dbe328fb82fd6674f2996bd
 
 def main(): 
 
     test_graph = game.graph()
-    test_graph.import_graph("ttr_europe_map_data.csv")
+    here = os.path.dirname(__file__)
+    map_path = os.path.join(here, "ttr_europe_map_data.csv")
+    test_graph.import_graph(map_path)
 
-    player1 = game.player("Saskia", "human")
-    player2 = game.player("Silvio", "human")
-    player3 = game.player("Edda", "human")
-    player4 = game.player("Hakon", "human")
-    # player5 = game.player("AI", "monte_carlo")
-    players = [player1, player2, player3, player4]
+    # Two-player simplified setup: one human, one AI (AI policy not implemented yet).
+    player_human = game.player("Human", "human")
+    player_ai = game.player("AI", "human")  # placeholder until search.py is implemented
+    players = [player_ai, player_human]
 
     deck_of_trains = game.deck()
     deck_of_trains.shuffle()
 
     test_game = state.state(test_graph, players, deck_of_trains)
+    # Give each player one destination ticket (currently a placeholder ticket generator).
+    for p in test_game.players:
+        p.give_route()
 
 
     while True:
-        if test_game.current_player.end_game: break
+        if rules.is_terminal(test_game):
+            break
         print(f"----------------------------- {test_game.current_round}: {test_game.current_player} -----------------------------")
         
         in_hand = test_game.current_player.cards
         print("\nCARDS IN HAND:")
         print(in_hand, "\n")
 
-        all_possible = rules.get_all_possible_actions(test_game)
+        all_possible = rules.legal_actions(test_game)
         print("ALL POSSIBLE:")
         print(all_possible, "\n")
 
         print("Number of trains left", test_game.current_player.trains)
  
-        action = rules.decide_action(test_game)
-        rules.apply_action(test_game, action)
-    print("endgame")
+        chosen_action = rules.decide_action(test_game)
+        rules.apply_action(test_game, chosen_action)
+
+    print("Game ended (endgame terminal condition reached).")
 
 
 

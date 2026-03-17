@@ -18,10 +18,11 @@ def E_s(game, player):
         if p.name != player.name:
             Delta_C_T += claimed_route_points(game.graph, p)
 
+    route_points = player.route["points"] if player.route is not None else 0
     evaluation = (
         Delta_C_T
         + models_P.P_L(game, player) * game.longest_route_points
-        + models_P.P_R(game, player) * player.route["points"]
+        + models_P.P_R(game, player) * route_points
         + models_P.C_c(game, player)
     )
 
@@ -140,8 +141,10 @@ def longest_path_bonus(graph, player, opponent, bonus_points=10):
     This follows the usual Ticket to Ride tie logic.
     If your assignment wants a different tie rule, change this function.
     """
-    player_longest = P_L._longest_chain_for_player(graph, player)
-    opponent_longest = P_L._longest_chain_for_player(graph, opponent)
+    # Import lazily to avoid circular imports.
+    import models_P
+    player_longest = models_P._longest_chain_for_player(graph, player)
+    opponent_longest = models_P._longest_chain_for_player(graph, opponent)
 
     if player_longest > opponent_longest:
         return bonus_points

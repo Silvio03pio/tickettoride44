@@ -7,14 +7,13 @@ COLOURS = ["red", "blue", "green", "yellow", "black", "white", "orange", "pink"]
 NBR_OF_CARDS_PER_COLOUR = 12
 
 class player:
-    def __init__(self, name, type):
+    def __init__(self, name, player_type="human"):
         self.name = name
-        self.type = type
+        self.type = player_type
         self.score = 0
         self.cards = []
         self.route = None # this is a route_card object
-        self.trains = 10
-        self.end_game = False
+        self.trains = 44
 
     def give_route(self):
 
@@ -84,7 +83,7 @@ class path:
 
     def __repr__(self):
         if len(self.nodes) == 2:
-            return f"path({self.path_id}: {self.nodes[0].name} <-> {self.nodes[1].name}, {self.distance}, {self.colour})\n"
+            return f"path({self.path_id}: {self.nodes[0].name} <-> {self.nodes[1].name}, {self.distance}, {self.colour})"
         return f"path(unconnected, {self.distance}, {self.colour})"
 
 class route_card:
@@ -183,7 +182,7 @@ class deck:
         return cards
 
     def shuffle(self):
-        self.deck = random.shuffle(self.cards)
+        random.shuffle(self.cards)
 
     def get_card_count(self): # Number of cards not stored, only counted when needed
         return len(self.cards)
@@ -499,6 +498,6 @@ def get_path_from_id(g, path_id):
     Returns the path or None if not found.
     """
     for p in g.paths:
-        if p.path_id == path_id:
+        if str(p.path_id) == str(path_id):
             return p
     return None
