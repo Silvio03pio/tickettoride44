@@ -3,6 +3,7 @@ from dataclasses import dataclass
 import random
 import game
 from game import path as Path
+import evaluation
 
 
 @dataclass
@@ -19,6 +20,12 @@ def claim_route(state, path):
     colour = path.colour
     train_count = path.distance
 
+    # Safety guard: do not allow (or score) claiming an already-occupied path.
+    # legal_actions(...) should already filter these out, but this prevents double-counting
+    # if claim_route(...) is called directly from somewhere else.
+    if path.occupation:
+        return False
+
     matching_cards = [card for card in player.cards if card.colour == colour]
 
     if len(matching_cards) < train_count:
@@ -31,6 +38,10 @@ def claim_route(state, path):
 
     path.occupation = player.name
     player.trains -= train_count
+
+    # Immediately award standard Ticket to Ride route points for this claim.
+    # We reuse the scoring table already defined in evaluation.py.
+    player.score += evaluation.points_for_path_length(train_count)
     # Endgame trigger: once any player hits <= 2 trains, every other player gets one final turn.
     # (Closest to standard Ticket to Ride, and avoids giving the trigger player an extra turn.)
     if (not state.endgame_triggered) and player.trains <= 2:

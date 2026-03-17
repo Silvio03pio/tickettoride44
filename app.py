@@ -6,6 +6,7 @@ import streamlit as st
 import streamlit.components.v1 as components
 
 import game
+import state
 import evaluation
 import models_P
 from graph_ui import create_map
@@ -18,17 +19,28 @@ def create_new_game():
     """
     Creates a fresh game state.
     """
+    here = os.path.dirname(__file__)
+    map_path = os.path.join(here, "ttr_europe_map_data.csv")
+
+    # Graph / map
     game_graph = game.graph()
-    game_graph.import_graph("ttr_europe_map_data.csv")
+    game_graph.import_graph(map_path)
 
-    player1 = game.player("human")
-    player2 = game.player("AI")
-    players = [player1, player2]
+    # Players
+    player_human = game.player("Human", "human")
+    player_ai = game.player("AI", "human")
+    players = [player_human, player_ai]
 
-    deck = game.deck()
-    deck.shuffle()
+    # Deck
+    deck_of_trains = game.deck()
+    deck_of_trains.shuffle()
 
-    current_game = game.game(game_graph, players, deck)
+    # Global state
+    current_game = state.state(game_graph, players, deck_of_trains)
+
+    # Give each player one destination ticket
+    for p in current_game.players:
+        p.give_route()
 
     return current_game
 
@@ -41,18 +53,21 @@ def ensure_session_state():
 
 
 def get_active_player(current_game):
-    return current_game.players[current_game.current_player]
+    return current_game.current_player
 
 
 def get_other_player(current_game):
-    return current_game.players[(current_game.current_player + 1) % len(current_game.players)]
+    for p in current_game.players:
+        if p != current_game.current_player:
+            return p
+    return None
 
 
 def route_text(player):
     if player.route is None:
         return "No route assigned"
     if isinstance(player.route, dict):
-        return f'{player.route["start"]} → {player.route["end"]} ({player.route["points"]} pts)'
+        return f'{player.route["start"]} -> {player.route["end"]} ({player.route["points"]} pts)'
     return str(player.route)
 
 
@@ -95,7 +110,7 @@ def unclaimed_paths(current_game):
                     "colour": p.get_colour(),
                     "length": p.get_distance(),
                     "obj": p,
-                    "label": f'{p.get_path_id()} | {p.get_start_node().name} ↔ {p.get_end_node().name} | {p.get_colour()} | {p.get_distance()}',
+                    "label": f'{p.get_path_id()} | {p.get_start_node().name} <-> {p.get_end_node().name} | {p.get_colour()} | {p.get_distance()}',
                 }
             )
     return rows
@@ -129,8 +144,11 @@ def can_claim_path(player, path):
 
 
 def advance_turn(current_game):
-    current_game.current_player = (current_game.current_player + 1) % len(current_game.players)
-    if current_game.current_player == 0:
+    current_index = current_game.players.index(current_game.current_player)
+    next_index = (current_index + 1) % len(current_game.players)
+    current_game.current_player = current_game.players[next_index]
+
+    if next_index == 0:
         current_game.current_round += 1
 
 
@@ -155,11 +173,25 @@ def render_map(current_game):
     os.unlink(temp_path)
 
 
+def draw_one_card(player, deck):
+    """
+    Draw one card from the deck and add it to the player's hand.
+    Returns the drawn card, or None if the deck is empty.
+    """
+    if deck.cards:
+        drawn_card = deck.cards.pop(0)
+        player.add_card_to_hand(drawn_card)
+        return drawn_card
+    return None
+
 ensure_session_state()
 current_game = st.session_state.current_game
+active_player = get_active_player(current_game)
+other_player = get_other_player(current_game)
+
 human = current_game.players[0]
 ai = current_game.players[1]
-active_player = get_active_player(current_game)
+
 
 st.title("Ticket to Ride AI")
 st.caption("Turn-based UI v1 with interactive map, card draw, and path claiming")
@@ -268,8 +300,9 @@ a1, a2, a3 = st.columns(3)
 with a1:
     st.write(f"Active player: **{active_player.name}**")
     if st.button("Draw 1 card"):
-        active_player.draw_card(current_game.deck)
-        advance_turn(current_game)
+        drawn_card = draw_one_card(active_player, current_game.deck)
+        if drawn_card is not None:
+            advance_turn(current_game)
         st.rerun()
 
 with a2:
