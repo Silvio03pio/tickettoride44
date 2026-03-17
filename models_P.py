@@ -1,18 +1,5 @@
 import game
-
-def points_for_path_length(length):
-    """
-    Returns the standard Ticket to Ride score for a claimed path length.
-    """
-    score_table = {
-        1: 1,
-        2: 2,
-        3: 4,
-        4: 7,
-        5: 10,
-        6: 15
-    }
-    return score_table.get(length, 0)
+import evaluation
 
 def count_colour_in_player_hand(player, colour):
     """
@@ -63,7 +50,7 @@ def delta_C_a(path):
     """
     Returns the immediate score gain of claiming a path.
     """
-    return points_for_path_length(path.get_distance())
+    return evaluation.points_for_path_length(path.get_distance())
 
 def C_c(game, player):
     """
@@ -88,7 +75,7 @@ def C_c(game, player):
         if colour is None:
             continue
 
-        p_colour = P_colour.P_colour(game.deck, colour)
+        p_colour = P_colour(game.deck, colour)
         cards_in_hand = count_colour_in_player_hand(player, colour)
         delta = delta_C_a(path)
 
@@ -116,7 +103,7 @@ def C_c_breakdown(game, player):
         if colour is None:
             continue
 
-        p_colour = P_colour.P_colour(game.deck, colour)
+        p_colour = P_colour(game.deck, colour)
         cards_in_hand = count_colour_in_player_hand(player, colour)
         delta = delta_C_a(path)
         n_paths_same_colour = count_available_paths_per_colour(game.graph, colour)
@@ -165,8 +152,7 @@ def all_probabilities(deck):
     """
     Returns a dict {colour: probability} for all standard colours.
     """
-    from game import COLOURS  # imported here to avoid circular import at module load
-    return {colour: P_colour(deck, colour) for colour in COLOURS}
+    return {colour: P_colour(deck, colour) for colour in game.COLOURS}
 
 def P_L(game, player):
     """
@@ -191,12 +177,10 @@ def P_L(game, player):
     denominator = 0
     for p in game.players:
         denominator += _longest_chain_for_player(game.graph, p)
-        print(f"{p}: denominator = {denominator}")
 
     if denominator == 0:
         return 0.0
 
-    print(f"n_consecutive = {n_consecutive}")
     prob = (n_consecutive / denominator)
     return max(0.0, min(1.0, prob)) # prob will always be between 0 and 1 anyway?
 
@@ -231,12 +215,16 @@ def P_R(game, player):
     """
     Route-completion related term P_R(s) for the given player.
     """
+    if player.route is None:
+        return 0.0
     start_node = game.get_node_from_name(game.graph, player.route["start"])
     end_node = game.get_node_from_name(game.graph, player.route["end"])
     start_graph = game.build_graph_of_player_from_node(start_node, player)
     end_graph = game.build_graph_of_player_from_node(end_node, player)
 
     shortest_connection = game.find_shortest_connection_between_subgraphs(start_graph, end_graph)
+    if shortest_connection is None:
+        return -1.0
     shortest_connection_length = shortest_connection["distance"]
 
     longest_possible = game.find_longest_possible_route(game.graph)
@@ -246,8 +234,6 @@ def P_R(game, player):
     N = longest_possible_length
     N_shortest = shortest_connection_length
 
-    # ormula
-    print(f"N = {N}, N_shortest = {N_shortest}")
     P_R = ((N - N_shortest) / N -0.5) * 2
     return P_R
 
