@@ -14,6 +14,7 @@ def main():
     player2 = game.player("Silvio", "human")
     player3 = game.player("Edda", "human")
     player4 = game.player("Hakon", "human")
+    # player5 = game.player("AI", "monte_carlo")
     players = [player1, player2, player3, player4]
 
     deck_of_trains = game.deck()
