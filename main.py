@@ -2,6 +2,7 @@ import game
 import state
 import models_P
 import evaluation
+import state_show
 
 def main(): 
 
@@ -96,6 +97,9 @@ def main():
   #  print("\nFirst 5 contributions:")
   #  for item in cc_breakdown["details"][:5]:
     #     print(item)
+
+ # state_show test
+    state_show.print_game_state(current_game)
 
 
 if __name__ == "__main__":
