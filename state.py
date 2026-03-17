@@ -10,18 +10,23 @@ from game import COLOURS, NBR_OF_CARDS_PER_COLOUR
 
 
 class state:
-    def __init__(self, graph, players, deck, longest_route_points=10):
+    def __init__(self, graph, players, deck, longest_path_points=10):
         self.graph = graph
         self.players = players
         self.deck = deck
-        self.longest_route_points = longest_route_points
+        self.longest_path_points = longest_path_points
         self.current_round = 0
-        self.discard = []  # cards spent when claiming routes (visible to all; order irrelevant)
+        self.discard = []  # cards spent when claiming paths (visible to all; order irrelevant)
         self.endgame_triggered = False
         self.final_turns_remaining = 0
         # Explicit terminal flags (supports early manual ending)
         self.terminal = False
         self.terminal_reason = None  # e.g. "endgame", "quit", "deck_empty"
+
+    # Backwards-compatible alias (older name used "route" for longest-path bonus)
+    @property
+    def longest_route_points(self):
+        return self.longest_path_points
 
     @property
     def current_player(self):
@@ -70,7 +75,7 @@ class _ObservableForAI:
         self.opponent_score = opp.score
         self.opponent_trains = opp.trains
         self.opponent_hand_size = len(opp.cards)
-        # Opponent's cards and route are not exposed.
+        # Opponent's cards and ticket are not exposed.
 
         # Discard: counts by colour (cards spent on claims)
         self.discard_counts = _count_cards_by_colour(full_state.discard)

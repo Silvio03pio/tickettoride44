@@ -1,7 +1,7 @@
 from pyvis.network import Network
 
 
-def route_display_color(route_colour: str) -> str:
+def path_display_color(path_colour: str) -> str:
     """
     Converts route colours to map-friendly colours.
     White is changed to light gray so it stays visible on a dark background.
@@ -18,7 +18,7 @@ def route_display_color(route_colour: str) -> str:
         "grey": "#9ca3af",
         "gray": "#9ca3af",
     }
-    return mapping.get(str(route_colour).lower(), "#9ca3af")
+    return mapping.get(str(path_colour).lower(), "#9ca3af")
 
 
 def create_map(graph, selected_path_id=None):
@@ -30,7 +30,7 @@ def create_map(graph, selected_path_id=None):
     - human claimed paths are highlighted in green
     - AI claimed paths are highlighted in red
     - selected path is thicker
-    - edge label shows required number of trains
+    - path label shows required number of trains
     """
     net = Network(
         height="650px",
@@ -65,12 +65,12 @@ def create_map(graph, selected_path_id=None):
             color="#f8fafc",
         )
 
-    # Add route edges
+    # Add path edges
     for path in graph.get_paths():
         start = path.get_start_node().name
         end = path.get_end_node().name
         occupation = path.get_occupation()
-        route_colour = path.get_colour()
+        path_colour = path.get_colour()
         distance = path.get_distance()
         path_id = path.get_path_id()
 
@@ -79,7 +79,7 @@ def create_map(graph, selected_path_id=None):
         elif occupation == "AI":
             edge_color = "#ef4444"
         else:
-            edge_color = route_display_color(route_colour)
+            edge_color = path_display_color(path_colour)
 
         width = 3
         if selected_path_id is not None and str(path_id) == str(selected_path_id):
@@ -90,7 +90,7 @@ def create_map(graph, selected_path_id=None):
         title = (
             f"Path ID: {path_id}<br>"
             f"{start} ↔ {end}<br>"
-            f"Colour: {route_colour}<br>"
+            f"Colour: {path_colour}<br>"
             f"Length: {distance}<br>"
             f"Owner: {occupation if occupation is not None else 'unclaimed'}"
         )

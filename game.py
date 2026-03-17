@@ -12,16 +12,16 @@ class player:
         self.type = player_type
         self.score = 0
         self.cards = []
-        self.route = None # this is a route_card object
+        self.ticket = None  # destination ticket (two cities + points)
         self.trains = 44
 
-    def give_route(self):
+    def give_ticket(self):
 
         # Apply random functions here sometime
         start = "Brest"
         end = "Petrograd"
         points = 21
-        self.route = {
+        self.ticket = {
             "start": start,
             "end": end,
             "points": points
@@ -86,10 +86,14 @@ class path:
             return f"path({self.path_id}: {self.nodes[0].name} <-> {self.nodes[1].name}, {self.distance}, {self.colour})"
         return f"path(unconnected, {self.distance}, {self.colour})"
 
-class route_card:
+class ticket:
     def __init__(self, destinations, points):
         self.destinations = destinations
         self.points = points
+
+
+# Backwards-compatible alias (older name).
+route_card = ticket
 
 class graph:
     def __init__(self):
@@ -192,13 +196,13 @@ class deck:
 
 def find_longest_possible_route(graph):
     """
-    Finds the longest shortest path in the graph, measured in number of paths (edges).
+    Finds the longest shortest path in the graph, measured in number of paths.
 
     What this means:
-    - For every pair of nodes in the graph, we imagine the shortest route between them,
+    - For every pair of nodes in the graph, we imagine the shortest connection between them,
       where each traversed path counts as 1 step.
     - Among all of those shortest routes, we find the one that is longest.
-    - This is the graph's "diameter" in terms of edge count.
+    - This is the graph's "diameter" in terms of path count.
 
     Returns:
         tuple:
@@ -240,7 +244,7 @@ def find_longest_possible_route(graph):
 
 def shortest_route_between_two_nodes(node1, node2, graph):
     """
-    Returns the shortest distance in number of edges between node1 and node2
+    Returns the shortest distance in number of paths between node1 and node2
     using BFS.
 
     Args:
@@ -250,7 +254,7 @@ def shortest_route_between_two_nodes(node1, node2, graph):
 
     Returns:
         int or float('inf'):
-            - shortest number of edges between node1 and node2
+            - shortest number of paths between node1 and node2
             - float('inf') if node2 is unreachable from node1
     """
 
@@ -287,7 +291,7 @@ def shortest_route_between_two_nodes(node1, node2, graph):
 
 def _bfs_shortest_route_lengths(start_node, graph):
     """
-    Returns the shortest number of edges from start_node to every node in graph.
+    Returns the shortest number of paths from start_node to every node in graph.
 
     This keeps the same name/signature as before so other files do not need to change.
     Internally, it now uses shortest_route_between_two_nodes(...) for each target node.
@@ -367,8 +371,8 @@ def find_shortest_connection_between_subgraphs(subgraph_a, subgraph_b):
       when deciding which node at the same depth to expand first.
 
     Important:
-    - Because depth (number of edges) is always the first priority,
-      this still returns a true shortest connection in edge count.
+    - Because depth (number of paths) is always the first priority,
+      this still returns a true shortest connection in path count.
     - The heuristic only affects which equally short candidate is explored first.
 
     Args:
@@ -378,9 +382,9 @@ def find_shortest_connection_between_subgraphs(subgraph_a, subgraph_b):
     Returns:
         dict with:
             {
-                "distance": int,              # number of edges in shortest connection
+                "distance": int,              # number of paths in shortest connection
                 "path_nodes": [node, ...],    # nodes from A-side to B-side
-                "path_edges": [path, ...],    # path objects along that route
+                "path_paths": [path, ...],    # path objects along that connection
                 "start_node": node,           # first node on route (in A)
                 "end_node": node              # first reached node in B
             }
@@ -404,7 +408,7 @@ def find_shortest_connection_between_subgraphs(subgraph_a, subgraph_b):
         return {
             "distance": 0,
             "path_nodes": [shared],
-            "path_edges": [],
+            "path_paths": [],
             "start_node": shared,
             "end_node": shared
         }
@@ -416,20 +420,20 @@ def find_shortest_connection_between_subgraphs(subgraph_a, subgraph_b):
     # Priority queue entries:
     # (depth, heuristic, tie_breaker, current_node)
     #
-    # depth is first -> guarantees shortest path in number of edges
+    # depth is first -> guarantees shortest path in number of paths
     # heuristic is second -> chooses promising node among equal-depth candidates
     frontier = []
     counter = 0
 
-    # Parent maps for reconstructing the path
+    # Parent maps for reconstructing the connection
     parent_node = {}
-    parent_edge = {}
+    parent_path = {}
     best_depth = {}
 
     for start in a_nodes:
         best_depth[start] = 0
         parent_node[start] = None
-        parent_edge[start] = None
+        parent_path[start] = None
         heapq.heappush(frontier, (0, heuristic_distance_to_b(start), counter, start))
         counter += 1
 
@@ -443,23 +447,23 @@ def find_shortest_connection_between_subgraphs(subgraph_a, subgraph_b):
         # Success: reached subgraph B
         if current in b_nodes:
             path_nodes = []
-            path_edges = []
+            path_paths = []
             node_cursor = current
 
             while node_cursor is not None:
                 path_nodes.append(node_cursor)
-                edge_used = parent_edge[node_cursor]
-                if edge_used is not None:
-                    path_edges.append(edge_used)
+                path_used = parent_path[node_cursor]
+                if path_used is not None:
+                    path_paths.append(path_used)
                 node_cursor = parent_node[node_cursor]
 
             path_nodes.reverse()
-            path_edges.reverse()
+            path_paths.reverse()
 
             return {
-                "distance": len(path_edges),
+                "distance": len(path_paths),
                 "path_nodes": path_nodes,
-                "path_edges": path_edges,
+                "path_paths": path_paths,
                 "start_node": path_nodes[0],
                 "end_node": path_nodes[-1]
             }
@@ -472,7 +476,7 @@ def find_shortest_connection_between_subgraphs(subgraph_a, subgraph_b):
             if neighbor not in best_depth or new_depth < best_depth[neighbor]:
                 best_depth[neighbor] = new_depth
                 parent_node[neighbor] = current
-                parent_edge[neighbor] = p
+                parent_path[neighbor] = p
 
                 heapq.heappush(
                     frontier,

@@ -6,7 +6,7 @@ def E_s(game, player):
     Non-terminal evaluation function E(s) for a given player.
 
     Uses:
-      - claimed_route_points from this module
+      - claimed_path_points from this module
       - P_L, P_R, C_c from models_P (imported lazily to avoid circular imports)
     """
     # Import here to avoid circular import at module load time
@@ -16,13 +16,13 @@ def E_s(game, player):
     Delta_C_T = 0
     for p in game.players:
         if p.name != player.name:
-            Delta_C_T += claimed_route_points(game.graph, p)
+            Delta_C_T += claimed_path_points(game.graph, p)
 
-    route_points = player.route["points"] if player.route is not None else 0
+    ticket_points = player.ticket["points"] if player.ticket is not None else 0
     evaluation = (
         Delta_C_T
-        + models_P.P_L(game, player) * game.longest_route_points
-        + models_P.P_R(game, player) * route_points
+        + models_P.P_L(game, player) * game.longest_path_points
+        + models_P.P_R(game, player) * ticket_points
         + models_P.C_c(game, player)
     )
 
@@ -31,7 +31,7 @@ def E_s(game, player):
 
 def points_for_path_length(length):
     """
-    Returns the number of points awarded for claiming a route
+    Returns the number of points awarded for claiming a path
     of a given length in Ticket to Ride Europe.
     """
     score_table = {
@@ -45,7 +45,7 @@ def points_for_path_length(length):
     return score_table.get(length, 0)
 
 
-def claimed_route_points(graph, player):
+def claimed_path_points(graph, player):
     """
     Sums the points from all paths claimed by the given player.
     """
@@ -117,12 +117,12 @@ def destination_ticket_points(graph, player):
     If the destination is completed: +points
     If not completed: -points
     """
-    if player.route is None:
+    if player.ticket is None:
         return 0
 
-    start_name = player.route["start"]
-    end_name = player.route["end"]
-    points = player.route["points"]
+    start_name = player.ticket["start"]
+    end_name = player.ticket["end"]
+    points = player.ticket["points"]
 
     if player_has_connection(graph, player, start_name, end_name):
         return points
@@ -163,11 +163,11 @@ def final_score(graph, player, opponent, longest_bonus=10):
         + destination ticket points
         + longest path bonus
     """
-    route_score = claimed_route_points(graph, player)
+    path_score = claimed_path_points(graph, player)
     ticket_score = destination_ticket_points(graph, player)
     longest_score = longest_path_bonus(graph, player, opponent, longest_bonus)
 
-    return route_score + ticket_score + longest_score
+    return path_score + ticket_score + longest_score
 
 
 def utility(game, ai_player, opponent_player, longest_bonus=10):
@@ -187,28 +187,32 @@ def utility_breakdown(game, ai_player, opponent_player, longest_bonus=10):
     Returns a detailed breakdown of all score components.
     Useful for debugging and testing.
     """
-    ai_route = claimed_route_points(game.graph, ai_player)
+    ai_path = claimed_path_points(game.graph, ai_player)
     ai_ticket = destination_ticket_points(game.graph, ai_player)
     ai_longest = longest_path_bonus(game.graph, ai_player, opponent_player, longest_bonus)
-    ai_total = ai_route + ai_ticket + ai_longest
+    ai_total = ai_path + ai_ticket + ai_longest
 
-    opp_route = claimed_route_points(game.graph, opponent_player)
+    opp_path = claimed_path_points(game.graph, opponent_player)
     opp_ticket = destination_ticket_points(game.graph, opponent_player)
     opp_longest = longest_path_bonus(game.graph, opponent_player, ai_player, longest_bonus)
-    opp_total = opp_route + opp_ticket + opp_longest
+    opp_total = opp_path + opp_ticket + opp_longest
 
     return {
         "AI": {
-            "route_points": ai_route,
+            "path_points": ai_path,
             "ticket_points": ai_ticket,
             "longest_bonus": ai_longest,
             "total": ai_total
         },
         "Opponent": {
-            "route_points": opp_route,
+            "path_points": opp_path,
             "ticket_points": opp_ticket,
             "longest_bonus": opp_longest,
             "total": opp_total
         },
         "utility": ai_total - opp_total
     }
+
+
+# Backwards-compatible aliases (older names).
+claimed_route_points = claimed_path_points

@@ -15,7 +15,7 @@ class Action:
     type: str
     path: Path = None  # None if draw; the path to claim if type \"c\"
 
-def claim_route(state, path):
+def claim_path(state, path):
     player = state.current_player
     colour = path.colour
     train_count = path.distance
@@ -52,14 +52,23 @@ def claim_route(state, path):
 
 def draw_card(state):
     player = state.current_player
-    if state.deck.cards: 
-        card = state.deck.cards.pop(0) # remocves top card from deck
+    # If the deck is empty, recycle the discard pile back into the deck.
+    # This keeps the game going as long as any cards have been spent on claims.
+    if (not state.deck.cards) and state.discard:
+        state.deck.cards.extend(state.discard)
+        state.deck.shuffle()
+        state.discard.clear()
+
+    if state.deck.cards:
+        card = state.deck.cards.pop(0)  # removes top card from deck
         player.cards.append(card)
-    else: 
-        return False # No cards in deck
+        return True
+
+    return False  # No cards anywhere (deck and discard are both empty)
 
 def apply_action(state, action):
     """Apply one action for the current player and advance the turn counter."""
+    endgame_was_triggered = state.endgame_triggered
     if action.type == "q":
         state.terminal = True
         state.terminal_reason = "quit"
@@ -70,11 +79,13 @@ def apply_action(state, action):
             state.terminal = True
             state.terminal_reason = "deck_empty"
     elif action.type == "c":
-        claim_route(state, action.path)
+        claim_path(state, action.path)
     else:
         return False
     state.current_round += 1
-    if state.endgame_triggered:
+    # If endgame was just triggered by *this* action, do not decrement yet.
+    # Decrement only for the subsequent players' turns.
+    if state.endgame_triggered and endgame_was_triggered:
         state.final_turns_remaining = max(0, state.final_turns_remaining - 1)
         if state.final_turns_remaining == 0:
             state.terminal = True
@@ -84,16 +95,15 @@ def apply_action(state, action):
 def legal_actions(state):
     possible_actions = []
 
-    # Allow manual early-ending only for a human player (AI should always play to completion).
-    if state.current_player.type == "human":
-        possible_actions.append(Action("q"))
-
-    # Draw is only legal if deck non-empty
-    if state.deck.get_card_count() > 0:
+    # Draw is legal if there is a card available in the deck, or if the discard pile
+    # can be reshuffled back into the deck.
+    can_draw = (state.deck.get_card_count() > 0) or (len(state.discard) > 0)
+    if can_draw:
         possible_actions.append(Action("d"))
 
     # Get all possible paths to place
     player = state.current_player
+    can_claim_any = False
     for path in state.graph.paths:  # loop through all paths
 
         colour = path.colour
@@ -109,6 +119,12 @@ def legal_actions(state):
         else:
             claim_path_action = Action("c", path) # We good: add to 
             possible_actions.append(claim_path_action)
+            can_claim_any = True
+
+    # Allow manual early-ending only for a human player.
+    # If the deck (and discard) are empty, force the player to claim if possible.
+    if state.current_player.type == "human" and (can_draw or (not can_claim_any)):
+        possible_actions.append(Action("q"))
     
     return possible_actions
 
@@ -186,6 +202,6 @@ def is_terminal(state):
 
 
 # Backwards-compatible aliases for older names used in notebooks/experiments.
-claim = claim_route
+claim = claim_path
 draw = draw_card
 action = Action

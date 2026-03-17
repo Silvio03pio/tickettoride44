@@ -40,7 +40,7 @@ def create_new_game():
 
     # Give each player one destination ticket
     for p in current_game.players:
-        p.give_route()
+        p.give_ticket()
 
     return current_game
 
@@ -64,11 +64,11 @@ def get_other_player(current_game):
 
 
 def route_text(player):
-    if player.route is None:
-        return "No route assigned"
-    if isinstance(player.route, dict):
-        return f'{player.route["start"]} -> {player.route["end"]} ({player.route["points"]} pts)'
-    return str(player.route)
+    if player.ticket is None:
+        return "No ticket assigned"
+    if isinstance(player.ticket, dict):
+        return f'{player.ticket["start"]} -> {player.ticket["end"]} ({player.ticket["points"]} pts)'
+    return str(player.ticket)
 
 
 def hand_summary(player):
@@ -220,7 +220,7 @@ with left:
     st.subheader("Human Player")
     st.metric("Score", human.score)
     st.metric("Trains Left", human.trains)
-    st.write("Route:", route_text(human))
+    st.write("Ticket:", route_text(human))
     st.write("Cards in hand:", len(human.cards))
     st.write("Hand summary:", hand_summary(human))
 
@@ -259,7 +259,7 @@ with right:
     st.subheader("AI Player")
     st.metric("Score", ai.score)
     st.metric("Trains Left", ai.trains)
-    st.write("Route:", route_text(ai))
+    st.write("Ticket:", route_text(ai))
     st.write("Cards in hand:", len(ai.cards))
     st.write("Hand summary:", hand_summary(ai))
 
@@ -335,14 +335,14 @@ try:
     with e1:
         st.write("**AI**")
         st.write("Total:", breakdown["AI"]["total"])
-        st.write("Route points:", breakdown["AI"]["route_points"])
+        st.write("Path points:", breakdown["AI"]["path_points"])
         st.write("Ticket points:", breakdown["AI"]["ticket_points"])
         st.write("Longest bonus:", breakdown["AI"]["longest_bonus"])
 
     with e2:
         st.write("**Human**")
         st.write("Total:", breakdown["Opponent"]["total"])
-        st.write("Route points:", breakdown["Opponent"]["route_points"])
+        st.write("Path points:", breakdown["Opponent"]["path_points"])
         st.write("Ticket points:", breakdown["Opponent"]["ticket_points"])
         st.write("Longest bonus:", breakdown["Opponent"]["longest_bonus"])
 
