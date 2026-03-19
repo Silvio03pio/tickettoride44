@@ -157,8 +157,8 @@ def all_probabilities(deck):
 def P_L(game, player):
     """
     Estimates the probability that the AI wins the Longest Path bonus.
-        N_consec_AI    = the longest simple path through the AI's claimed edges.
-        N_consec_Opp   = the longest simple path through the opponent's claimed edges.
+        N_consec_AI    = the longest simple path through the AI's claimed paths.
+        N_consec_Opp   = the longest simple path through the opponent's claimed paths.
     """
 
     # Old: only two players, only works for AI, assumes AI is players[0]
@@ -186,8 +186,8 @@ def P_L(game, player):
 
 def _longest_chain_for_player(full_graph, player):
     """
-    Finds the longest simple path (in number of edges) across all connected
-    components of the given player's claimed routes.
+    Finds the longest simple path (in number of paths) across all connected
+    components of the given player's claimed paths.
     Each connected component is only computed once: once a node has been
     assigned to a component it is skipped in subsequent iterations.
     """
@@ -203,7 +203,7 @@ def _longest_chain_for_player(full_graph, player):
         visited_nodes.update(component.nodes)
 
         if not component.paths:
-            continue  # node has no claimed edges — nothing to measure
+            continue  # node has no claimed paths — nothing to measure
 
         chain_length = game.find_longest_possible_route(component)[0]
         if chain_length > longest:
@@ -213,12 +213,12 @@ def _longest_chain_for_player(full_graph, player):
 
 def P_R(game, player):
     """
-    Route-completion related term P_R(s) for the given player.
+    Ticket-completion related term P_R(s) for the given player.
     """
-    if player.route is None:
+    if player.ticket is None:
         return 0.0
-    start_node = game.get_node_from_name(game.graph, player.route["start"])
-    end_node = game.get_node_from_name(game.graph, player.route["end"])
+    start_node = game.get_node_from_name(game.graph, player.ticket["start"])
+    end_node = game.get_node_from_name(game.graph, player.ticket["end"])
     start_graph = game.build_graph_of_player_from_node(start_node, player)
     end_graph = game.build_graph_of_player_from_node(end_node, player)
 

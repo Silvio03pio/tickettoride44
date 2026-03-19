@@ -69,18 +69,18 @@ def deck_summary(deck):
 
 def route_summary(player):
     """
-    Returns a readable route summary for a player.
+    Returns a readable ticket summary for a player.
     """
-    if player.route is None:
+    if player.ticket is None:
         return "No destination ticket assigned"
 
-    if isinstance(player.route, dict):
-        return f'{player.route["start"]} -> {player.route["end"]} ({player.route["points"]} points)'
+    if isinstance(player.ticket, dict):
+        return f'{player.ticket["start"]} -> {player.ticket["end"]} ({player.ticket["points"]} points)'
 
-    if hasattr(player.route, "destinations") and hasattr(player.route, "points"):
-        return f'{player.route.destinations} ({player.route.points} points)'
+    if hasattr(player.ticket, "destinations") and hasattr(player.ticket, "points"):
+        return f'{player.ticket.destinations} ({player.ticket.points} points)'
 
-    return str(player.route)
+    return str(player.ticket)
 
 
 def print_player_state(game, player):
@@ -92,7 +92,7 @@ def print_player_state(game, player):
     print(f"\n=== PLAYER: {player.name} ===")
     print(f"Score: {player.score}")
     print(f"Trains left: {player.trains}")
-    print(f"Destination ticket: {route_summary(player)}")
+    print(f"Ticket: {route_summary(player)}")
     print(f"Cards on hand: {hand_summary(player)}")
     print(f"Claimed paths: {len(claimed)}")
 

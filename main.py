@@ -27,7 +27,7 @@ def _format_hand(cards):
     return "  ".join(parts) if parts else "(empty)"
 
 
-def _load_route_tickets(csv_path):
+def _load_tickets(csv_path):
     tickets = []
     with open(csv_path, newline="", encoding="utf-8") as f:
         reader = csv.DictReader(f)
@@ -52,8 +52,8 @@ def _print_turn_header(game_state):
     print(f"Turn {game_state.current_round} | Current player: {p.name} ({p.type})")
     print("-" * 72)
     print(f"Score: {p.score} | Trains left: {p.trains}")
-    if p.route is not None:
-        print(f"Ticket: {p.route['start']} -> {p.route['end']} ({p.route['points']} pts)")
+    if p.ticket is not None:
+        print(f"Ticket: {p.ticket['start']} -> {p.ticket['end']} ({p.ticket['points']} pts)")
     else:
         print("Ticket: (none)")
     print(f"Hand: {_format_hand(p.cards)}")
@@ -77,14 +77,14 @@ def _print_actions(game_state, actions):
 def _print_final_scoring(game_state, ai_index=0):
     ai = game_state.players[ai_index]
     opp = game_state.players[1 - ai_index]
-    breakdown = evaluation.utility_breakdown(game_state, ai, opp, longest_bonus=game_state.longest_route_points)
+    breakdown = evaluation.utility_breakdown(game_state, ai, opp, longest_bonus=game_state.longest_path_points)
 
     print("\n" + "#" * 72)
     print("FINAL SCORING")
     print(f"Terminal reason: {game_state.terminal_reason}")
     print("-" * 72)
-    print(f"{ai.name} total: {breakdown['AI']['total']} (routes {breakdown['AI']['route_points']}, ticket {breakdown['AI']['ticket_points']}, longest {breakdown['AI']['longest_bonus']})")
-    print(f"{opp.name} total: {breakdown['Opponent']['total']} (routes {breakdown['Opponent']['route_points']}, ticket {breakdown['Opponent']['ticket_points']}, longest {breakdown['Opponent']['longest_bonus']})")
+    print(f"{ai.name} total: {breakdown['AI']['total']} (paths {breakdown['AI']['path_points']}, ticket {breakdown['AI']['ticket_points']}, longest {breakdown['AI']['longest_bonus']})")
+    print(f"{opp.name} total: {breakdown['Opponent']['total']} (paths {breakdown['Opponent']['path_points']}, ticket {breakdown['Opponent']['ticket_points']}, longest {breakdown['Opponent']['longest_bonus']})")
     print("-" * 72)
     print(f"Utility U(s) = {breakdown['utility']}  (AI - Opponent)")
     print("#" * 72 + "\n")
@@ -99,14 +99,15 @@ def main():
 
     # Two-player simplified setup: one AI placeholder (random) and one human.
     player_ai = game.player("AI", "random")  # placeholder until MCTS
-    player_human = game.player("Human", "human")
-    players = [player_ai, player_human]
+    player_human1 = game.player("Human 1", "human")
+    # player_human2 = game.player("Human 2", "human")
+    players = [player_ai, player_human1] # , player_human2]
 
     # Defensive reset: ensures a fresh start even if this file is run multiple times
     # in the same Python process / interactive session.
     for p in players:
         p.cards = []
-        p.route = None
+        p.ticket = None
         p.score = 0
         p.trains = 44
 
@@ -116,11 +117,11 @@ def main():
     test_game = state.state(test_graph, players, deck_of_trains)
 
     # Destination tickets: 1 per player, secret (we only show current player's ticket in terminal).
-    tickets = _load_route_tickets(_here_path("route_cards.csv"))
+    tickets = _load_tickets(_here_path("route_cards.csv"))
     random.shuffle(tickets)
     for i, p in enumerate(test_game.players):
         # Copy dict so it can't be shared/mutated across players/runs
-        p.route = dict(tickets[i % len(tickets)])
+        p.ticket = dict(tickets[i % len(tickets)])
 
     # Initial hands: empty (per simplified rules). Players must draw to get cards.
 
