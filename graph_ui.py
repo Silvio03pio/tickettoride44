@@ -215,9 +215,9 @@ def create_map(graph, selected_path_id=None):
             end,
             # Use a per-edge color config so hover/highlight keeps ownership obvious.
             color={
-                "color": base_color,
-                "highlight": base_color,
-                "hover": base_color,
+                "color": edge_color,
+                "highlight": edge_color,
+                "hover": edge_color,
                 "inherit": False,
                 # Slightly dim unclaimed routes so claimed routes stand out more.
                 "opacity": 0.85 if occupation is None else 1.0,
@@ -231,7 +231,7 @@ def create_map(graph, selected_path_id=None):
             # Glow-like emphasis: strengthen shadow for claimed routes.
             shadow={
                 "enabled": True,
-                "color": base_color if occupation is not None else "rgba(0,0,0,0.35)",
+                "color": edge_color if occupation is not None else "rgba(0,0,0,0.35)",
                 "size": 18 if occupation is not None else 10,
                 "x": 1,
                 "y": 1,
