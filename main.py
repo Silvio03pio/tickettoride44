@@ -2,6 +2,7 @@
 import os
 import csv
 import random
+import time
 
 import game
 import rules
@@ -74,7 +75,7 @@ def _print_actions(game_state, actions):
             print(f"- c: Claim path {path.path_id} | {start} <-> {end} | len {path.distance} | {path.colour}")
 
 
-def _print_final_scoring(game_state, ai_index=0):
+def _print_final_scoring(game_state, ai_index=0, player_times=None):
     ai = game_state.players[ai_index]
     opp = game_state.players[1 - ai_index]
     breakdown = evaluation.utility_breakdown(game_state, ai, opp, longest_bonus=game_state.longest_path_points)
@@ -87,6 +88,10 @@ def _print_final_scoring(game_state, ai_index=0):
     print(f"{opp.name} total: {breakdown['Opponent']['total']} (paths {breakdown['Opponent']['path_points']}, ticket {breakdown['Opponent']['ticket_points']}, longest {breakdown['Opponent']['longest_bonus']})")
     print("-" * 72)
     print(f"Utility U(s) = {breakdown['utility']}  (AI - Opponent)")
+    if player_times:
+        print("-" * 72)
+        for name, total in player_times.items():
+            print(f"Total decision time for {name}: {total:.2f}s")
     print("#" * 72 + "\n")
 
 
@@ -98,10 +103,11 @@ def main():
     test_graph.import_graph(_here_path("ttr_europe_map_data.csv"))
 
     # Two-player simplified setup: one AI placeholder (random) and one human.
-    player_ai = game.player("AI", "random")  # placeholder until MCTS
+    player_monte = game.player("Monte Carlo", "monte_carlo")  # placeholder until MCTS
+    player_ab = game.player("Alpha Beta", "alpha_beta_pruning") 
     player_human1 = game.player("Human 1", "human")
     # player_human2 = game.player("Human 2", "human")
-    players = [player_ai, player_human1] # , player_human2]
+    players = [player_monte, player_ab] #, player_human1] # , player_human2]
 
     # Defensive reset: ensures a fresh start even if this file is run multiple times
     # in the same Python process / interactive session.
@@ -126,14 +132,21 @@ def main():
     # Initial hands: empty (per simplified rules). Players must draw to get cards.
 
 
+    player_times = {p.name: 0.0 for p in test_game.players}
+
     while not rules.is_terminal(test_game):
         _print_turn_header(test_game)
         actions = rules.legal_actions(test_game)
         _print_actions(test_game, actions)
+        current_name = test_game.current_player.name
+        t0 = time.time()
         chosen_action = rules.decide_action(test_game)
+        elapsed = time.time() - t0
+        player_times[current_name] += elapsed
+        print(f"  [{current_name} decided in {elapsed:.2f}s]")
         rules.apply_action(test_game, chosen_action)
 
-    _print_final_scoring(test_game, ai_index=0)
+    _print_final_scoring(test_game, ai_index=0, player_times=player_times)
 
 
 if __name__ == "__main__":

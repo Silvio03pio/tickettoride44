@@ -14,6 +14,11 @@ from typing import Any, Dict, Optional, Tuple
 import evaluation
 import rules
 
+# ── Programmer-controlled knob ────────────────────────────────────────────────
+# Change this one number to set how many rollouts Monte Carlo uses per action.
+N_SIMULATIONS: int = 50
+# ─────────────────────────────────────────────────────────────────────────────
+
 
 def clone_state(game_state):
     """
@@ -73,16 +78,18 @@ def _action_key(action) -> Tuple[Any, ...]:
     return (a_type, path_id, repr(action))
 
 
-def random_rollout(sim_state):
+def random_rollout(sim_state, player_name: str):
     """
     Starting from a simulation state, play random legal actions until terminal.
 
     During rollouts, BOTH players may act randomly. The terminal score is always
-    evaluated from the AI perspective using evaluation.utility(...).
+    evaluated from the perspective of the player whose name is `player_name`.
     """
-    # Resolve the AI/opponent objects *inside the simulation state* (deepcopied objects).
-    ai_player = get_ai_player(sim_state)
-    opponent_player = get_opponent_player(sim_state)
+    # Resolve the target player and its opponent inside the (deepcopied) sim state.
+    ai_player = next((p for p in sim_state.players if p.name == player_name), None)
+    if ai_player is None:
+        raise ValueError(f"Player '{player_name}' not found in simulation state.")
+    opponent_player = next((p for p in sim_state.players if p.name != player_name), None)
 
     # Safety valve in case a bug creates non-terminating dynamics.
     max_steps = 10_000
@@ -115,7 +122,7 @@ def random_rollout(sim_state):
     return evaluation.utility(sim_state, ai_player, opponent_player)
 
 
-def monte_carlo_action_value(game_state, action, n_simulations: int = 50):
+def monte_carlo_action_value(game_state, action, player_name: str, n_simulations: int = 50):
     """
     Estimate the value of one candidate action using random rollouts.
 
@@ -123,7 +130,7 @@ def monte_carlo_action_value(game_state, action, n_simulations: int = 50):
       - clone the state
       - apply the candidate action once
       - run n_simulations independent random rollouts from that resulting state
-      - return the average terminal utility
+      - return (average_utility, wins, n_simulations)
     """
     if n_simulations <= 0:
         raise ValueError("n_simulations must be >= 1")
@@ -132,60 +139,63 @@ def monte_carlo_action_value(game_state, action, n_simulations: int = 50):
     ok = rules.apply_action(base, action)
     if ok is False:
         # Illegal or failed application: treat as extremely bad.
-        return float("-inf")
+        return float("-inf"), 0, n_simulations
 
     total = 0.0
+    wins = 0
     for _ in range(n_simulations):
         sim = clone_state(base)
-        total += float(random_rollout(sim))
+        result = float(random_rollout(sim, player_name))
+        total += result
+        if result > 0:
+            wins += 1
 
-    return total / float(n_simulations)
+    return total / float(n_simulations), wins, n_simulations
 
 
 def choose_best_action_monte_carlo(game_state, n_simulations: int = 50):
     """
-    Choose the best action for the AI using plain Monte Carlo rollout evaluation.
+    Choose the best action for the current player using plain Monte Carlo rollout evaluation.
 
     Returns:
       - best_action: the selected action object (or None if no legal actions exist)
       - action_values: dict mapping action_key -> average rollout utility
-
-    Raises:
-        ValueError: if called when it is not the AI's turn.
     """
     current_player = getattr(game_state, "current_player", None)
-    current_name = getattr(current_player, "name", None)
-    if current_name != "AI":
-        raise ValueError(
-            f'Monte Carlo search is only allowed on AI turn (current player is "{current_name}").'
-        )
+    if current_player is None:
+        return None, {}
+    player_name = getattr(current_player, "name", None)
 
     actions = rules.legal_actions(game_state)
     if not actions:
         return None, {}
 
-    # The rules module intends early-quit to be human-only.
-    # Some UIs may accidentally mark the AI as type="human", which would make "q" appear.
-    # We explicitly remove quit for the AI to keep rollouts meaningful.
+    # "quit" is a human-only action; strip it so rollouts stay meaningful.
     actions = [a for a in actions if getattr(a, "type", None) != "q"]
     if not actions:
         return None, {}
 
     action_values: Dict[Tuple[Any, ...], float] = {}
+    action_win_stats = []  # list of (action, wins, n_simulations, avg_value)
     best_action = None
     best_value = float("-inf")
+    best_wins = 0
+    best_n = 0
 
     for a in actions:
-        v = monte_carlo_action_value(game_state, a, n_simulations=n_simulations)
+        v, wins, n = monte_carlo_action_value(game_state, a, player_name, n_simulations=n_simulations)
         action_values[_action_key(a)] = float(v)
+        action_win_stats.append((a, wins, n, float(v)))
         if v > best_value:
             best_value = float(v)
             best_action = a
+            best_wins = wins
+            best_n = n
 
-    return best_action, action_values
+    return best_action, action_values, best_wins, best_n, action_win_stats
 
 
-def choose_action(observable_state, n_simulations: int = 50):
+def choose_action(observable_state, n_simulations: int = 10):
     """
     Backwards-compatible integration hook.
 
@@ -215,7 +225,7 @@ def choose_action(observable_state, n_simulations: int = 50):
             "an AI-observable view was provided."
         )
 
-    best_action, _ = choose_best_action_monte_carlo(observable_state, n_simulations=n_simulations)
+    best_action, _, _, _, _ = choose_best_action_monte_carlo(observable_state, n_simulations=n_simulations)
     return best_action
 
 

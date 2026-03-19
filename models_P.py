@@ -211,14 +211,14 @@ def _longest_chain_for_player(full_graph, player):
 
     return longest
 
-def P_R(game, player):
+def P_R(state, player):
     """
     Ticket-completion related term P_R(s) for the given player.
     """
     if player.ticket is None:
         return 0.0
-    start_node = game.get_node_from_name(game.graph, player.ticket["start"])
-    end_node = game.get_node_from_name(game.graph, player.ticket["end"])
+    start_node = game.get_node_from_name(state.graph, player.ticket["start"])
+    end_node = game.get_node_from_name(state.graph, player.ticket["end"])
     start_graph = game.build_graph_of_player_from_node(start_node, player)
     end_graph = game.build_graph_of_player_from_node(end_node, player)
 
@@ -227,13 +227,13 @@ def P_R(game, player):
         return -1.0
     shortest_connection_length = shortest_connection["distance"]
 
-    longest_possible = game.find_longest_possible_route(game.graph)
+    longest_possible = game.find_longest_possible_route(state.graph)
     longest_possible_length = longest_possible[0]
 
     # To match with word file
     N = longest_possible_length
     N_shortest = shortest_connection_length
 
-    P_R = ((N - N_shortest) / N -0.5) * 2
+    P_R = ((N - N_shortest) / N - 0.5) * 2
     return P_R
 

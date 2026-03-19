@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>The Cartographer’s Ledger - Orient Express Digital</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,700;1,6..72,400&amp;family=Space+Grotesk:wght@300;400;500;700&amp;family=Work+Sans:wght@300;400;500;600&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              "on-tertiary-fixed-variant": "#5a4400",
+              "primary-fixed": "#d5e3ff",
+              "on-secondary-fixed-variant": "#7c2c23",
+              "on-error": "#ffffff",
+              "background": "#fff9ed",
+              "surface-variant": "#ebe2c8",
+              "surface-bright": "#fff9ed",
+              "on-primary-container": "#9ab1da",
+              "on-tertiary-fixed": "#251a00",
+              "on-tertiary": "#ffffff",
+              "tertiary-container": "#554000",
+              "on-tertiary-container": "#cfac55",
+              "on-background": "#1f1c0b",
+              "inverse-primary": "#b0c7f1",
+              "primary-container": "#2d4467",
+              "on-secondary": "#ffffff",
+              "surface-container-low": "#fcf3d8",
+              "tertiary-fixed": "#ffdf96",
+              "on-surface": "#1f1c0b",
+              "tertiary": "#3a2b00",
+              "on-secondary-fixed": "#400101",
+              "outline": "#73777e",
+              "on-secondary-container": "#75271f",
+              "outline-variant": "#c3c6ce",
+              "inverse-surface": "#35301e",
+              "surface-tint": "#485f84",
+              "surface-container-high": "#f1e8cd",
+              "on-primary": "#ffffff",
+              "surface-container": "#f7eed2",
+              "secondary": "#9b4338",
+              "on-error-container": "#93000a",
+              "tertiary-fixed-dim": "#e7c268",
+              "error-container": "#ffdad6",
+              "error": "#ba1a1a",
+              "surface-container-highest": "#ebe2c8",
+              "primary": "#142d4f",
+              "inverse-on-surface": "#faf0d5",
+              "secondary-container": "#fd8f81",
+              "on-primary-fixed-variant": "#30476a",
+              "surface": "#fff9ed",
+              "secondary-fixed-dim": "#ffb4a9",
+              "surface-container-lowest": "#ffffff",
+              "on-primary-fixed": "#001b3c",
+              "surface-dim": "#e2dabf",
+              "on-surface-variant": "#43474d",
+              "primary-fixed-dim": "#b0c7f1",
+              "secondary-fixed": "#ffdad5"
+            },
+            fontFamily: {
+              "headline": ["Newsreader"],
+              "body": ["Work Sans"],
+              "label": ["Space Grotesk"]
+            },
+            borderRadius: {"DEFAULT": "0.125rem", "lg": "0.25rem", "xl": "0.5rem", "full": "0.75rem"},
+          },
+        },
+      }
+    </script>
+<style>.material-symbols-outlined {
+    font-variation-settings: "FILL" 0, "wght" 400, "GRAD" 0, "opsz" 24
+    }
+body {
+    background-color: #fff9ed;
+    color: #1f1c0b;
+    font-family: "Work Sans", sans-serif;
+    overflow: hidden
+    }
+.map-texture {
+    background-image: url(https://lh3.googleusercontent.com/aida-public/AB6AXuBSz-FB8Kvvaz34p0IMDIFL19qR4gl9CrYOO-73uKd-fYjasCV6EZ2n5J6cUKuhwN8yKfVYX_24gtLEQ1d_bIhcyjWXXEEfCGJGAh6fjZlPRyuIIsfUkV65_LlX0bRhTaPznh12AeF0eYqSAzvhYizc5qAuNqF7_x5D15CcVkwT9OESaMuzMtzzIJDKs_CojVl7Aa9G_oOZaSVAjYBr3t2BZGVrGuLGYKnHZSsfFLNxuW1JFaF6Z86R24w364R8SR7YpUt0bQmAdeU);
+    background-size: cover;
+    background-position: center
+    }
+.glass-panel {
+    background: rgba(255, 249, 237, 0.8);
+    backdrop-filter: blur(12px)
+    }
+.ticket-stack-item {
+    transition: transform 0.3s ease
+    }
+.ticket-stack-item:hover {
+    transform: translatey(-20px)
+    }</style>
+</head>
+<body class="bg-background text-on-surface">
+<!-- TopAppBar -->
+<header class="fixed top-0 w-full z-50 flex justify-between items-center px-12 h-20 bg-[#fff9ed] shadow-[0_12px_32px_rgba(31,28,11,0.08)]">
+<div class="flex items-center gap-8">
+<span class="font-serif italic text-2xl text-[#142d4f] tracking-tight">The Cartographer’s Ledger</span>
+<nav class="hidden md:flex gap-6 items-center">
+<a class="text-[#142d4f] border-b-2 border-[#142d4f] pb-1 font-bold font-label text-sm uppercase tracking-wider" href="#">Map</a>
+<a class="text-[#1f1c0b]/60 hover:text-[#142d4f] font-label text-sm uppercase tracking-wider transition-colors" href="#">History</a>
+<a class="text-[#1f1c0b]/60 hover:text-[#142d4f] font-label text-sm uppercase tracking-wider transition-colors" href="#">Analytics</a>
+<a class="text-[#1f1c0b]/60 hover:text-[#142d4f] font-label text-sm uppercase tracking-wider transition-colors" href="#">Settings</a>
+</nav>
+</div>
+<div class="flex items-center gap-12">
+<!-- Scoreboard -->
+<div class="flex items-center gap-8 font-label">
+<div class="flex flex-col items-end">
+<span class="text-[10px] uppercase opacity-60 tracking-widest">Human (You)</span>
+<div class="flex items-center gap-2">
+<span class="text-2xl font-bold text-primary">84</span>
+<div class="flex gap-1">
+<span class="material-symbols-outlined text-sm" style="font-variation-settings: 'FILL' 1;">train</span>
+<span class="text-sm font-medium">22</span>
+</div>
+</div>
+</div>
+<div class="h-8 w-px bg-outline-variant/30"></div>
+<div class="flex flex-col items-start">
+<span class="text-[10px] uppercase opacity-60 tracking-widest text-secondary">AI Strategist</span>
+<div class="flex items-center gap-2">
+<span class="text-2xl font-bold text-secondary">72</span>
+<div class="flex gap-1">
+<span class="material-symbols-outlined text-sm" style="font-variation-settings: 'FILL' 1;">train</span>
+<span class="text-sm font-medium">18</span>
+</div>
+</div>
+</div>
+</div>
+<div class="flex items-center gap-4">
+<button class="bg-primary text-on-primary px-6 py-2 rounded-sm font-label uppercase tracking-widest text-xs hover:scale-95 transition-transform duration-150">End Turn</button>
+<div class="flex gap-2">
+<span class="material-symbols-outlined text-on-surface-variant cursor-pointer hover:bg-black/5 p-2 rounded-full transition-colors" data-icon="volume_up">volume_up</span>
+<span class="material-symbols-outlined text-on-surface-variant cursor-pointer hover:bg-black/5 p-2 rounded-full transition-colors" data-icon="help_outline">help_outline</span>
+</div>
+</div>
+</div>
+</header>
+<!-- SideNavBar -->
+<aside class="fixed left-0 top-20 h-[calc(100vh-5rem)] flex flex-col p-6 z-40 bg-[#f2ebd9] w-80 shadow-sm">
+<div class="mb-8 px-2">
+<div class="flex items-center gap-3 mb-1">
+<span class="material-symbols-outlined text-primary text-3xl" style="font-variation-settings: 'FILL' 1;">psychology</span>
+<div>
+<h2 class="font-serif text-[#142d4f] text-lg leading-none">AI Rollout</h2>
+<p class="font-label text-[10px] uppercase tracking-tighter opacity-60">Monte Carlo Engine v2.4</p>
+</div>
+</div>
+</div>
+<nav class="flex-1 space-y-2">
+<div class="group flex items-center justify-between p-3 text-[#142d4f] bg-[#fff9ed]/80 rounded-sm shadow-sm ring-1 ring-[#142d4f]/10 cursor-pointer">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined" data-icon="analytics">analytics</span>
+<span class="font-mono text-xs uppercase tracking-widest">Diagnostics</span>
+</div>
+<span class="font-mono font-bold text-xs">ONLINE</span>
+</div>
+<div class="flex flex-col gap-4 mt-8 px-2">
+<div class="space-y-1">
+<label class="font-label text-[10px] uppercase tracking-widest opacity-50">Simulation Confidence</label>
+<div class="flex items-end justify-between">
+<span class="font-headline italic text-3xl text-primary">68%</span>
+<span class="font-label text-xs text-primary/60 mb-1">High Accuracy</span>
+</div>
+<div class="w-full bg-surface-variant h-1 rounded-full overflow-hidden">
+<div class="bg-primary h-full w-[68%]"></div>
+</div>
+</div>
+<div class="space-y-1 mt-4">
+<label class="font-label text-[10px] uppercase tracking-widest opacity-50">Live Rollouts</label>
+<div class="flex items-baseline gap-2">
+<span class="font-label text-2xl font-bold">1,000</span>
+<span class="font-label text-[10px] opacity-40">cycles/sec</span>
+</div>
+</div>
+<div class="mt-6">
+<label class="font-label text-[10px] uppercase tracking-widest opacity-50 mb-2 block">Monte Carlo Log</label>
+<div class="bg-surface-dim/40 p-3 rounded-sm space-y-2 max-h-48 overflow-y-auto font-mono text-[10px] leading-relaxed">
+<p class="text-primary/70">14:02:11 &gt; Evaluating Paris-Berlin route...</p>
+<p class="text-primary/70">14:02:12 &gt; Opponent hand analysis: 4 Blue, 2 Red</p>
+<p class="text-secondary">14:02:14 &gt; Conflict detected: Munchen Junction</p>
+<p class="text-primary/70">14:02:15 &gt; Recalculating detour via Zurich...</p>
+<p class="text-primary/70">14:02:16 &gt; Path optimization complete.</p>
+</div>
+</div>
+</div>
+</nav>
+<button class="mt-auto bg-primary text-on-primary py-4 rounded-sm font-label uppercase tracking-widest text-xs flex items-center justify-center gap-2 hover:translate-x-1 transition-transform">
+<span class="material-symbols-outlined text-sm" data-icon="query_stats">query_stats</span>
+            Recalculate Path
+        </button>
+</aside>
+<!-- Main Content: The Map -->
+<main class="ml-80 pt-20 h-screen relative overflow-hidden flex items-center justify-center bg-surface-dim p-12">
+<div class="w-full h-full rounded-sm overflow-hidden shadow-2xl relative map-texture" data-alt="Vintage textured map of early 20th century Europe with railway lines" data-location="Europe" style="">
+<!-- Overlay UI for Route Interaction -->
+<div class="absolute top-8 right-8 flex flex-col gap-4">
+<div class="glass-panel p-6 rounded-sm shadow-lg border-l-4 border-secondary max-w-xs">
+<h3 class="font-headline text-xl text-primary mb-1">Current Objective</h3>
+<p class="font-body text-sm text-on-surface-variant mb-4">Complete the connection from <span class="font-bold">Paris</span> to <span class="font-bold">Roma</span>.</p>
+<div class="flex justify-between items-end">
+<span class="font-label text-2xl font-bold text-secondary">12</span>
+<span class="font-label text-[10px] uppercase tracking-widest opacity-60">Victory Points</span>
+</div>
+</div>
+<!-- Action Floating Panel -->
+<div class="flex flex-col gap-2">
+<button class="bg-primary text-on-primary p-4 rounded-sm flex items-center justify-between group hover:bg-primary/90 transition-colors">
+<span class="font-label uppercase tracking-widest text-xs">Draw Cards</span>
+<span class="material-symbols-outlined group-hover:translate-x-1 transition-transform" data-icon="style">style</span>
+</button>
+<button class="bg-secondary text-on-secondary p-4 rounded-sm flex items-center justify-between group hover:bg-secondary/90 transition-colors">
+<span class="font-label uppercase tracking-widest text-xs">Claim Route</span>
+<span class="material-symbols-outlined group-hover:translate-x-1 transition-transform" data-icon="map">map</span>
+</button>
+</div>
+</div>
+<!-- Visual Route Hints (Abstract Representation) -->
+<div class="absolute inset-0 pointer-events-none opacity-40">
+<svg class="stroke-primary fill-none" height="100%" width="100%">
+<path d="M 300 400 L 450 380 L 600 450" stroke-dasharray="10 5" stroke-width="8"></path>
+<path class="stroke-secondary" d="M 600 450 L 750 600" stroke-dasharray="10 5" stroke-width="8"></path>
+</svg>
+</div>
+</div>
+<!-- Hand Panel (Footer Overlay) -->
+<div class="absolute bottom-0 left-80 right-0 p-8 flex justify-center pointer-events-none">
+<div class="pointer-events-auto glass-panel p-6 rounded-t-xl shadow-[0_-12px_40px_rgba(0,0,0,0.1)] flex gap-8 items-end max-w-5xl w-full border-t border-white/20">
+<!-- Ticket Stack -->
+<div class="flex-1 flex flex-col">
+<span class="font-label text-[10px] uppercase tracking-widest opacity-50 mb-4">Active Destination Tickets</span>
+<div class="flex -space-x-12">
+<!-- Ticket 1 -->
+<div class="ticket-stack-item w-40 h-56 bg-surface-container-lowest rounded-xl shadow-lg border border-outline-variant/30 p-4 flex flex-col justify-between cursor-pointer rotate-[-2deg]">
+<div class="flex justify-between items-start">
+<span class="material-symbols-outlined text-primary" data-icon="confirmation_number">confirmation_number</span>
+<span class="font-label text-xl font-bold">12</span>
+</div>
+<div class="text-center">
+<p class="font-headline text-lg leading-tight">Paris</p>
+<div class="h-px w-full bg-outline-variant/30 my-2"></div>
+<p class="font-headline text-lg leading-tight">Roma</p>
+</div>
+<div class="flex justify-center">
+<span class="font-label text-[10px] uppercase tracking-tighter opacity-40">Serial No. 8821</span>
+</div>
+</div>
+<!-- Ticket 2 -->
+<div class="ticket-stack-item w-40 h-56 bg-surface-container-lowest rounded-xl shadow-lg border border-outline-variant/30 p-4 flex flex-col justify-between cursor-pointer rotate-[1deg]">
+<div class="flex justify-between items-start">
+<span class="material-symbols-outlined text-primary" data-icon="confirmation_number">confirmation_number</span>
+<span class="font-label text-xl font-bold">8</span>
+</div>
+<div class="text-center">
+<p class="font-headline text-lg leading-tight">Berlin</p>
+<div class="h-px w-full bg-outline-variant/30 my-2"></div>
+<p class="font-headline text-lg leading-tight">Warszawa</p>
+</div>
+<div class="flex justify-center">
+<span class="font-label text-[10px] uppercase tracking-tighter opacity-40">Serial No. 9042</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Train Cards Hand -->
+<div class="flex flex-col items-end">
+<span class="font-label text-[10px] uppercase tracking-widest opacity-50 mb-4">Your Hand (Train Cards)</span>
+<div class="flex gap-3">
+<div class="flex flex-col items-center gap-1">
+<div class="w-12 h-16 bg-blue-700 rounded-sm shadow-md border-2 border-white/20 flex items-center justify-center">
+<span class="text-white font-label font-bold">5</span>
+</div>
+<span class="text-[10px] font-label uppercase">Blue</span>
+</div>
+<div class="flex flex-col items-center gap-1">
+<div class="w-12 h-16 bg-red-700 rounded-sm shadow-md border-2 border-white/20 flex items-center justify-center">
+<span class="text-white font-label font-bold">3</span>
+</div>
+<span class="text-[10px] font-label uppercase">Red</span>
+</div>
+<div class="flex flex-col items-center gap-1">
+<div class="w-12 h-16 bg-emerald-700 rounded-sm shadow-md border-2 border-white/20 flex items-center justify-center">
+<span class="text-white font-label font-bold">1</span>
+</div>
+<span class="text-[10px] font-label uppercase">Green</span>
+</div>
+<div class="flex flex-col items-center gap-1">
+<div class="w-12 h-16 bg-slate-800 rounded-sm shadow-md border-2 border-white/20 flex items-center justify-center">
+<span class="text-white font-label font-bold">0</span>
+</div>
+<span class="text-[10px] font-label uppercase opacity-30">Black</span>
+</div>
+<div class="flex flex-col items-center gap-1">
+<div class="w-12 h-16 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-sm shadow-md border-2 border-white/20 flex items-center justify-center relative overflow-hidden">
+<div class="absolute inset-0 opacity-20 bg-[radial-gradient(circle,_var(--tw-gradient-stops))] from-white to-transparent"></div>
+<span class="text-white font-label font-bold z-10">2</span>
+</div>
+<span class="text-[10px] font-label uppercase text-on-tertiary-fixed-variant font-bold">Loco</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+</main>
+<!-- Contextual FAB (Hidden on this view per rules if it doesn't align, but here it represents 'Next Action') -->
+<!-- Suppressed to prioritize the clean Map/Hand layout -->
+</body></html>

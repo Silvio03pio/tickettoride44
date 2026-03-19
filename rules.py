@@ -1,9 +1,16 @@
 
 from dataclasses import dataclass
+import copy
 import random
 import game
 from game import path as Path
 import evaluation
+
+# ── Programmer-controlled knob ────────────────────────────────────────────────
+# Maximum search depth for Alpha-Beta Pruning. At depth 0 (leaf not yet terminal)
+# the heuristic E_s is used instead of a full rollout.
+AB_DEPTH: int = 5
+# ─────────────────────────────────────────────────────────────────────────────
 
 
 @dataclass
@@ -13,18 +20,48 @@ class Action:
     type: \"d\" (draw), \"c\" (claim), or \"q\" (quit/end early).
     """
     type: str
-    path: Path = None  # None if draw; the path to claim if type \"c\"
+    path: Path = None   # None if draw; the path to claim if type "c"
+    colour: str = None  # explicit colour choice when claiming a grey path
 
-def claim_path(state, path):
+def claim_path(state, path, chosen_colour=None):
     player = state.current_player
-    colour = path.colour
     train_count = path.distance
 
-    # Safety guard: do not allow (or score) claiming an already-occupied path.
-    # legal_actions(...) should already filter these out, but this prevents double-counting
-    # if claim_route(...) is called directly from somewhere else.
-    if path.occupation:
+    # Always look up the path inside THIS state's graph so that deep-copied simulation
+    # states never accidentally mutate path objects that belong to the original state.
+    real_path = None
+    for p in state.graph.paths:
+        if p.get_path_id() == path.get_path_id():
+            real_path = p
+            break
+    if real_path is None:
         return False
+
+    # Safety guard: do not allow (or score) claiming an already-occupied path.
+    if real_path.occupation:
+        return False
+
+    colour = real_path.colour
+
+    # Grey paths accept any single colour.
+    # Use the explicitly chosen colour if provided; otherwise auto-pick the colour
+    # the player has the most of (consistent with what the UI displays).
+    if colour == "gray":
+        if chosen_colour is not None:
+            # Validate the caller's choice
+            if sum(1 for card in player.cards if card.colour == chosen_colour) >= train_count:
+                colour = chosen_colour
+            else:
+                return False
+        else:
+            best_colour, best_count = None, 0
+            for c in game.COLOURS:
+                cnt = sum(1 for card in player.cards if card.colour == c)
+                if cnt >= train_count and cnt > best_count:
+                    best_count, best_colour = cnt, c
+            if best_colour is None:
+                return False
+            colour = best_colour
 
     matching_cards = [card for card in player.cards if card.colour == colour]
 
@@ -36,7 +73,7 @@ def claim_path(state, path):
         player.cards.remove(card)
     state.discard.extend(cards_to_remove)
 
-    path.occupation = player.name
+    real_path.occupation = player.name
     player.trains -= train_count
 
     # Immediately award standard Ticket to Ride route points for this claim.
@@ -50,21 +87,29 @@ def claim_path(state, path):
 
     return path
 
-def draw_card(state):
+def _draw_one_card(state):
+    """Draw a single card for the current player. Returns True if a card was drawn."""
     player = state.current_player
-    # If the deck is empty, recycle the discard pile back into the deck.
-    # This keeps the game going as long as any cards have been spent on claims.
+    # Recycle discard pile into deck when deck runs out
     if (not state.deck.cards) and state.discard:
         state.deck.cards.extend(state.discard)
         state.deck.shuffle()
         state.discard.clear()
-
     if state.deck.cards:
-        card = state.deck.cards.pop(0)  # removes top card from deck
+        card = state.deck.cards.pop(0)
         player.cards.append(card)
         return True
+    return False
 
-    return False  # No cards anywhere (deck and discard are both empty)
+
+def draw_card(state):
+    """Draw 2 cards for the current player (standard Ticket to Ride rules).
+    Returns True if at least 1 card was drawn, False if deck and discard are both empty."""
+    drew_any = False
+    for _ in range(2):
+        if _draw_one_card(state):
+            drew_any = True
+    return drew_any
 
 def apply_action(state, action):
     """Apply one action for the current player and advance the turn counter."""
@@ -79,8 +124,10 @@ def apply_action(state, action):
             state.terminal = True
             state.terminal_reason = "deck_empty"
     elif action.type == "c":
-
-        claim_path(state, action.path)
+        chosen_colour = getattr(action, "colour", None)
+        result = claim_path(state, action.path, chosen_colour=chosen_colour)
+        if result is False:
+            return False  # claim failed — do NOT advance turn
     else:
         return False
     state.current_round += 1
@@ -108,19 +155,29 @@ def legal_actions(state):
     for path in state.graph.paths:  # loop through all paths
 
         colour = path.colour
-        train_count = path.distance 
-        matching_cards = [card for card in player.cards if card.colour == colour]
-        
-        if path.occupation: 
-            continue # occupied: exclude from possible
+        train_count = path.distance
+
+        if path.occupation:
+            continue  # occupied: exclude from possible
         if player.trains < train_count:
-            continue # not enough trains left
-        if len(matching_cards) < train_count: 
-            continue # Not enough cards: exclude from possible
+            continue  # not enough trains left
+
+        # Grey paths accept any single colour — check if the player has enough of any colour.
+        if colour == "gray":
+            has_enough = any(
+                sum(1 for c in player.cards if c.colour == col) >= train_count
+                for col in game.COLOURS
+            )
+            if not has_enough:
+                continue
         else:
-            claim_path_action = Action("c", path) # We good: add to 
-            possible_actions.append(claim_path_action)
-            can_claim_any = True
+            matching_cards = [card for card in player.cards if card.colour == colour]
+            if len(matching_cards) < train_count:
+                continue  # Not enough cards: exclude from possible
+
+        claim_path_action = Action("c", path)
+        possible_actions.append(claim_path_action)
+        can_claim_any = True
 
     # Allow manual early-ending only for a human player.
     # If the deck (and discard) are empty, force the player to claim if possible.
@@ -176,6 +233,116 @@ def human_decide_action(state):
 
         print("Invalid input. Please type d, c, or q.")
 
+def monte_carlo_decide_action(state):
+    """
+    Use Monte Carlo rollouts to pick the best legal action for the current player.
+
+    The number of rollouts per action is controlled by search.N_SIMULATIONS.
+    Returns an Action object.
+    """
+    import search  # imported here to avoid circular imports at module load time
+    best_action, _, wins, n, action_win_stats = search.choose_best_action_monte_carlo(
+        state, n_simulations=search.N_SIMULATIONS
+    )
+    if action_win_stats:
+        print("  Monte Carlo rollout results:")
+        for a, w, sims, avg in action_win_stats:
+            label = a.type
+            if a.type == "c" and a.path is not None:
+                label = f"claim {a.path.path_id}"
+            marker = " <-- chosen" if a is best_action else ""
+            print(f"    {label}: wins/explorations = {w}/{sims} = {w/sims:.2f}  (avg utility {avg:.2f}){marker}")
+    # Fallback: if search returns nothing (e.g. no actions), draw a card.
+    return best_action if best_action is not None else Action("d")
+
+def _ab_search(sim_state, depth, alpha, beta, maximizing, our_name, opp_name):
+    """
+    Recursive Alpha-Beta search.
+
+    our_name  : name of the player we are maximising for.
+    opp_name  : name of the opponent.
+    maximizing: True when it is our_name's turn in this node.
+
+    Returns a scalar value (higher = better for our_name).
+    """
+    # Leaf cases ──────────────────────────────────────────────────────────────
+    if is_terminal(sim_state):
+        our  = next(p for p in sim_state.players if p.name == our_name)
+        opp  = next(p for p in sim_state.players if p.name == opp_name)
+        return evaluation.utility(sim_state, our, opp)
+
+    if depth == 0:
+        our  = next(p for p in sim_state.players if p.name == our_name)
+        return evaluation.E_s(sim_state, our)
+
+    # Generate children ───────────────────────────────────────────────────────
+    actions = [a for a in legal_actions(sim_state) if a.type != "q"]
+    if not actions:
+        # No moves left — treat as terminal.
+        our  = next(p for p in sim_state.players if p.name == our_name)
+        opp  = next(p for p in sim_state.players if p.name == opp_name)
+        return evaluation.utility(sim_state, our, opp)
+
+    if maximizing:
+        value = float("-inf")
+        for action in actions:
+            child = copy.deepcopy(sim_state)
+            apply_action(child, action)
+            child_max = (child.current_player.name == our_name)
+            v = _ab_search(child, depth - 1, alpha, beta, child_max, our_name, opp_name)
+            value = max(value, v)
+            alpha = max(alpha, v)
+            if beta <= alpha:
+                break  # beta cut-off
+        return value
+    else:
+        value = float("inf")
+        for action in actions:
+            child = copy.deepcopy(sim_state)
+            apply_action(child, action)
+            child_max = (child.current_player.name == our_name)
+            v = _ab_search(child, depth - 1, alpha, beta, child_max, our_name, opp_name)
+            value = min(value, v)
+            beta = min(beta, v)
+            if beta <= alpha:
+                break  # alpha cut-off
+        return value
+
+
+def alpha_beta_pruning_decide_action(state):
+    """
+    Choose the best legal action for the current player using Alpha-Beta Pruning.
+
+    Search depth is controlled by AB_DEPTH (module-level constant).
+    Terminal nodes are scored with evaluation.utility; depth-limit nodes with E_s.
+    Returns an Action object.
+    """
+    our_name = state.current_player.name
+    opp_name = next(p.name for p in state.players if p.name != our_name)
+
+    actions = [a for a in legal_actions(state) if a.type != "q"]
+    if not actions:
+        return Action("d")
+
+    best_action = None
+    best_value  = float("-inf")
+    alpha       = float("-inf")
+    beta        = float("inf")
+
+    for action in actions:
+        child = copy.deepcopy(state)
+        apply_action(child, action)
+        child_max = (child.current_player.name == our_name)
+        v = _ab_search(child, AB_DEPTH - 1, alpha, beta, child_max, our_name, opp_name)
+        if v > best_value:
+            best_value  = v
+            best_action = action
+        alpha = max(alpha, v)
+
+    print(f"  Alpha-Beta: evaluation value of chosen action = {best_value}")
+    return best_action if best_action is not None else Action("d")
+
+
 def decide_action(state):
     """
     Returns an action for the current player.
@@ -189,9 +356,19 @@ def decide_action(state):
     if player.type == "human":
         return human_decide_action(state)
 
-    if player.type in ("ai", "random", "monte_carlo"):
+    if player.type == "random":
         actions = legal_actions(state)
         return random.choice(actions) if actions else Action("d")
+    
+    if player.type == "monte_carlo":
+        action = monte_carlo_decide_action(state)
+        print("Action chosen by Monte Carlo: ", action)
+        return action
+    
+    if player.type == "alpha_beta_pruning":
+        action = alpha_beta_pruning_decide_action(state)
+        print("Action chosen by Alpha Beta Pruning: ", action)
+        return action
 
     # Fallback to interactive
     return human_decide_action(state)
