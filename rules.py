@@ -70,7 +70,11 @@ def apply_action(state, action):
             state.terminal = True
             state.terminal_reason = "deck_empty"
     elif action.type == "c":
-        claim_route(state, action.path)
+        # Claiming must only succeed if the route can actually be claimed.
+        # If the claim fails (occupied / insufficient cards / etc.), do NOT advance the turn.
+        ok = claim_route(state, action.path)
+        if ok is False:
+            return False
     else:
         return False
     state.current_round += 1

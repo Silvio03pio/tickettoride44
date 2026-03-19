@@ -21,6 +21,65 @@ def route_display_color(route_colour: str) -> str:
     return mapping.get(str(route_colour).lower(), "#9ca3af")
 
 
+def _owner_edge_color(owner_name: str | None) -> str | None:
+    """
+    Color convention for claimed routes.
+
+    IMPORTANT: in this codebase, path.occupation stores the *player name* (e.g. "Human", "AI"),
+    not the player type ("human"/"ai").
+    """
+    if owner_name is None:
+        return None
+    if str(owner_name) == "AI":
+        return "#ef4444"  # red
+    if str(owner_name) == "Human":
+        return "#22c55e"  # green
+    # Unknown owner name (future extensions): fall back to a readable neutral.
+    return "#a78bfa"  # purple
+
+
+def _scaled_positions(nodes):
+    """
+    Convert longitude/latitude to stable on-screen x/y.
+
+    We normalize coordinates so the map fits nicely in the PyVis canvas and does not depend
+    on the raw coordinate magnitudes.
+    """
+    coords = []
+    for n in nodes:
+        if hasattr(n, "longitude") and hasattr(n, "latitude"):
+            try:
+                coords.append((n, float(n.longitude), float(n.latitude)))
+            except Exception:
+                continue
+
+    if not coords:
+        return {}
+
+    xs = [x for _, x, _ in coords]
+    ys = [y for _, _, y in coords]
+    min_x, max_x = min(xs), max(xs)
+    min_y, max_y = min(ys), max(ys)
+
+    # Avoid division by zero in degenerate cases.
+    span_x = max(1e-9, (max_x - min_x))
+    span_y = max(1e-9, (max_y - min_y))
+
+    # Target canvas scale in "vis.js coordinate space"
+    target_w = 1200.0
+    target_h = 700.0
+
+    out = {}
+    for n, lon, lat in coords:
+        # Normalize to 0..1 then scale, centered around (0,0). Invert latitude so north is up.
+        nx = (lon - min_x) / span_x
+        ny = (lat - min_y) / span_y
+        x = (nx - 0.5) * target_w
+        y = -(ny - 0.5) * target_h
+        out[n.name] = (x, y)
+    return out
+
+
 def create_map(graph, selected_path_id=None):
     """
     Builds an interactive Pyvis network for the Ticket to Ride map.
@@ -40,18 +99,72 @@ def create_map(graph, selected_path_id=None):
         directed=False,
     )
 
-    net.barnes_hut()
+    # We use fixed node positions from the CSV coordinates (when available) so the board
+    # looks like an actual map instead of a "network blob".
     net.toggle_physics(False)
+    net.set_options(
+        """
+        {
+          "interaction": {
+            "hover": true,
+            "tooltipDelay": 80,
+            "navigationButtons": true,
+            "keyboard": true
+          },
+          "nodes": {
+            "shape": "dot",
+            "size": 12,
+            "borderWidth": 2,
+            "shadow": {
+              "enabled": true,
+              "color": "rgba(0,0,0,0.45)",
+              "size": 8,
+              "x": 2,
+              "y": 2
+            },
+            "font": {
+              "size": 16,
+              "color": "#e5e7eb",
+              "strokeWidth": 3,
+              "strokeColor": "#0b1220"
+            },
+            "color": {
+              "background": "#0f172a",
+              "border": "#94a3b8",
+              "highlight": {
+                "background": "#1f2937",
+                "border": "#fbbf24"
+              }
+            }
+          },
+          "edges": {
+            "smooth": {
+              "type": "dynamic"
+            },
+            "shadow": {
+              "enabled": true,
+              "color": "rgba(0,0,0,0.35)",
+              "size": 10,
+              "x": 1,
+              "y": 1
+            },
+            "font": {
+              "size": 18,
+              "color": "#f9fafb",
+              "strokeWidth": 4,
+              "strokeColor": "#0b1220",
+              "background": "rgba(17,24,39,0.65)"
+            }
+          }
+        }
+        """
+    )
 
     # Add city nodes
-    for node in graph.get_nodes():
-        x = None
-        y = None
-
-        # Use map coordinates if available
-        if hasattr(node, "longitude") and hasattr(node, "latitude"):
-            x = float(node.longitude) * 25
-            y = -float(node.latitude) * 25
+    nodes = graph.get_nodes()
+    pos = _scaled_positions(nodes)
+    for node in nodes:
+        x, y = pos.get(node.name, (None, None))
 
         net.add_node(
             node.name,
@@ -60,9 +173,6 @@ def create_map(graph, selected_path_id=None):
             x=x,
             y=y,
             physics=False,
-            shape="dot",
-            size=12,
-            color="#f8fafc",
         )
 
     # Add route edges
@@ -74,18 +184,17 @@ def create_map(graph, selected_path_id=None):
         distance = path.get_distance()
         path_id = path.get_path_id()
 
-        if occupation == "human":
-            edge_color = "#22c55e"
-        elif occupation == "AI":
-            edge_color = "#ef4444"
-        else:
-            edge_color = route_display_color(route_colour)
+        owner_color = _owner_edge_color(occupation)
+        base_color = owner_color if owner_color is not None else route_display_color(route_colour)
 
-        width = 3
-        if selected_path_id is not None and str(path_id) == str(selected_path_id):
-            width = 7
+        # Make claimed routes and the selected route pop visually.
+        is_selected = selected_path_id is not None and str(path_id) == str(selected_path_id)
+        if is_selected:
+            width = 8
         elif occupation is not None:
-            width = 5
+            width = 6
+        else:
+            width = 3
 
         title = (
             f"Path ID: {path_id}<br>"
@@ -98,10 +207,29 @@ def create_map(graph, selected_path_id=None):
         net.add_edge(
             start,
             end,
-            color=edge_color,
+            # Use a per-edge color config so hover/highlight keeps ownership obvious.
+            color={
+                "color": base_color,
+                "highlight": base_color,
+                "hover": base_color,
+                "inherit": False,
+                # Slightly dim unclaimed routes so claimed routes stand out more.
+                "opacity": 0.85 if occupation is None else 1.0,
+            },
             width=width,
+            # Show required trains directly on the edge (always visible).
             label=str(distance),
             title=title,
+            # Make the selected route extra visible without changing core game state.
+            dashes=True if is_selected else False,
+            # Glow-like emphasis: strengthen shadow for claimed routes.
+            shadow={
+                "enabled": True,
+                "color": base_color if occupation is not None else "rgba(0,0,0,0.35)",
+                "size": 18 if occupation is not None else 10,
+                "x": 1,
+                "y": 1,
+            },
         )
 
     return net
