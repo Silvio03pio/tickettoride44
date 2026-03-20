@@ -96,7 +96,7 @@ def create_new_game(
     return current_game
 
 
-def execute_ai_turn(current_game, n_rollouts=50):
+def execute_ai_turn(current_game, n_rollouts=1000):
     messages = []
 
     if current_game.terminal:

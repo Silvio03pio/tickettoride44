@@ -9,7 +9,11 @@ import evaluation
 import game
 import rules
 from graph_ui import create_map
-from main2 import create_new_game, hand_summary, execute_ai_turn
+
+try:
+    from main import create_new_game, hand_summary, execute_ai_turn
+except ImportError:
+    from main2 import create_new_game, hand_summary, execute_ai_turn
 
 
 st.set_page_config(page_title="Ticket to Ride AI", layout="wide")
@@ -30,6 +34,8 @@ def ensure_session_state():
         st.session_state.show_debug = False
     if "ai_last_executed_round" not in st.session_state:
         st.session_state.ai_last_executed_round = None
+    if "show_only_claimable_routes" not in st.session_state:
+        st.session_state.show_only_claimable_routes = True
 
 
 def reset_game_state():
@@ -104,6 +110,26 @@ def count_matching_cards(player, colour):
     return count
 
 
+def can_claim_path(player, path):
+    needed = path.get_distance()
+    colour = path.get_colour()
+    available = count_matching_cards(player, colour)
+    return available >= needed, available, needed, colour
+
+
+def claimable_paths(current_game, player):
+    rows = []
+    for item in unclaimed_paths(current_game):
+        can_claim, available, needed, colour = can_claim_path(player, item["obj"])
+        if can_claim:
+            enriched = dict(item)
+            enriched["available"] = available
+            enriched["needed"] = needed
+            enriched["claim_colour"] = colour
+            rows.append(enriched)
+    return rows
+
+
 def selected_path_data(current_game):
     path_id = st.session_state.selected_path_id
     if path_id is None:
@@ -121,13 +147,6 @@ def selected_path_data(current_game):
         "length": p.get_distance(),
         "obj": p,
     }
-
-
-def can_claim_path(player, path):
-    needed = path.get_distance()
-    colour = path.get_colour()
-    available = count_matching_cards(player, colour)
-    return available >= needed, available, needed, colour
 
 
 def _set_message(text: str):
@@ -214,11 +233,16 @@ with st.sidebar:
         step=10,
     )
 
+    st.session_state.show_only_claimable_routes = st.checkbox(
+        "Show only claimable routes",
+        value=st.session_state.show_only_claimable_routes,
+    )
+
     rollouts = st.session_state.rollouts
     show_debug = st.session_state.show_debug
 
     st.divider()
-    st.caption("Tip: select a route from the dropdown to highlight it on the map.")
+    st.caption("Tip: use the search box or route ID to find a path quickly.")
 
 st.markdown(
     """
@@ -289,11 +313,94 @@ st.markdown(
         font-weight: 800;
       }
 
-      .stSelectbox > div[data-baseweb="select"] > div {
-        background: rgba(15, 23, 42, 0.9) !important;
+      .stButton > button:hover {
+        border-color: rgba(251, 191, 36, 0.72);
+        box-shadow: 0 8px 18px rgba(0, 0, 0, 0.24);
+      }
+
+      .stTextInput label,
+      .stSelectbox label,
+      .stSlider label,
+      .stCheckbox label {
         color: #ffffff !important;
-        border: 1px solid rgba(148, 163, 184, 0.18);
-        border-radius: 12px;
+        font-weight: 800 !important;
+        letter-spacing: 0.2px;
+      }
+
+      .stTextInput input {
+        background: #1e293b !important;
+        color: #ffffff !important;
+        border: 1px solid rgba(255, 255, 255, 0.18) !important;
+        border-radius: 12px !important;
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
+      }
+
+      .stTextInput input:focus {
+        border: 1px solid rgba(251, 191, 36, 0.75) !important;
+        box-shadow:
+          0 0 0 1px rgba(251, 191, 36, 0.35),
+          0 0 0 4px rgba(251, 191, 36, 0.12) !important;
+      }
+
+      .stTextInput input::placeholder {
+        color: #cbd5e1 !important;
+        opacity: 1 !important;
+      }
+
+      /* Closed select */
+      .stSelectbox > div[data-baseweb="select"] > div {
+        background: #ffffff !important;
+        color: #111827 !important;
+        border: 1px solid #d1d5db !important;
+        border-radius: 12px !important;
+        min-height: 46px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.16);
+      }
+
+      .stSelectbox > div[data-baseweb="select"] > div:hover {
+        border: 1px solid #94a3b8 !important;
+      }
+
+      .stSelectbox > div[data-baseweb="select"] span {
+        color: #111827 !important;
+        font-weight: 600 !important;
+      }
+
+      .stSelectbox > div[data-baseweb="select"] input {
+        color: #111827 !important;
+      }
+
+      .stSelectbox > div[data-baseweb="select"] svg {
+        fill: #111827 !important;
+      }
+
+      /* Open dropdown */
+      div[role="listbox"] {
+        background: #ffffff !important;
+        border: 1px solid #d1d5db !important;
+        border-radius: 12px !important;
+        box-shadow: 0 12px 28px rgba(0, 0, 0, 0.22) !important;
+        padding: 6px !important;
+      }
+
+      div[role="option"] {
+        background: #ffffff !important;
+        color: #111827 !important;
+        border-radius: 8px !important;
+        margin: 2px 0 !important;
+        padding: 10px 12px !important;
+        font-weight: 600 !important;
+      }
+
+      div[role="option"]:hover {
+        background: #e5e7eb !important;
+        color: #111827 !important;
+      }
+
+      div[aria-selected="true"] {
+        background: #fbbf24 !important;
+        color: #111827 !important;
+        font-weight: 800 !important;
       }
 
       div[data-testid="stDataFrame"] * {
@@ -390,27 +497,81 @@ with center:
     st.subheader("Board")
     st.caption("Edge labels show required trains. Hover a route for full details.")
 
-    free_paths = unclaimed_paths(current_game)
-    if free_paths:
-        labels = [item["label"] for item in free_paths]
-        current_label = None
-
-        if st.session_state.selected_path_id is not None:
-            for item in free_paths:
-                if str(item["id"]) == str(st.session_state.selected_path_id):
-                    current_label = item["label"]
-                    break
-
-        selected_label = st.selectbox(
-            "Highlight a route",
-            options=labels,
-            index=labels.index(current_label) if current_label in labels else 0,
-        )
-
-        chosen = next(item for item in free_paths if item["label"] == selected_label)
-        st.session_state.selected_path_id = chosen["id"]
+    show_only_claimable = st.session_state.show_only_claimable_routes
+    if show_only_claimable:
+        base_paths = claimable_paths(current_game, active_player)
     else:
-        st.info("No unclaimed routes left.")
+        base_paths = unclaimed_paths(current_game)
+
+    if base_paths:
+        s1, s2 = st.columns([1.1, 2.2])
+
+        with s1:
+            route_id_input = st.text_input(
+                "Jump to route ID",
+                value="",
+                placeholder="e.g. 12",
+                key="route_id_jump",
+            ).strip()
+
+        with s2:
+            search_query = st.text_input(
+                "Search route by id, city or colour",
+                value="",
+                placeholder="Example: Paris, blue, 12",
+                key="route_search_box",
+            ).strip().lower()
+
+        if route_id_input:
+            matched = next(
+                (item for item in base_paths if str(item["id"]) == route_id_input),
+                None
+            )
+            if matched is not None:
+                st.session_state.selected_path_id = matched["id"]
+
+        filtered_paths = base_paths
+        if search_query:
+            filtered_paths = [
+                item for item in base_paths
+                if search_query in str(item["id"]).lower()
+                or search_query in item["start"].lower()
+                or search_query in item["end"].lower()
+                or search_query in item["colour"].lower()
+                or search_query in item["label"].lower()
+            ]
+
+        if not filtered_paths:
+            st.warning("No routes match your search.")
+        else:
+            caption_prefix = "claimable" if show_only_claimable else "available"
+            st.caption(
+                f"Showing {len(filtered_paths)} {caption_prefix} route(s) out of {len(base_paths)}."
+            )
+
+            labels = [item["label"] for item in filtered_paths]
+            current_label = None
+
+            if st.session_state.selected_path_id is not None:
+                for item in filtered_paths:
+                    if str(item["id"]) == str(st.session_state.selected_path_id):
+                        current_label = item["label"]
+                        break
+
+            selected_label = st.selectbox(
+                "Highlight a route",
+                options=labels,
+                index=labels.index(current_label) if current_label in labels else 0,
+                key="route_selectbox",
+            )
+
+            chosen = next(item for item in filtered_paths if item["label"] == selected_label)
+            st.session_state.selected_path_id = chosen["id"]
+    else:
+        if show_only_claimable:
+            st.info("No claimable routes available for the active player right now.")
+        else:
+            st.info("No unclaimed routes left.")
 
     render_map(current_game)
 
