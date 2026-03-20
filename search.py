@@ -18,7 +18,7 @@ import evaluation
 import rules
 
 # ── Programmer-controlled knobs ──────────────────────────────────────────────
-N_SIMULATIONS: int = 1000          # Total MCTS iterations (tree walks)
+N_SIMULATIONS: int = 100          # Total MCTS iterations (tree walks)
 EXPLORATION_CONSTANT: float = 1.41  # C in UCB1 = sqrt(2) ≈ 1.41
 MAX_ROLLOUT_STEPS: int = 10_000   # Safety cap on rollout depth
 OPPONENT_TEMPERATURE: float = 1.0   # Boltzmann temperature for opponent policy
@@ -114,16 +114,14 @@ def _sample_opponent_action(state, actions):
     return random.choices(actions, weights=weights, k=1)[0]
 
 
-def _advance_env_until_ai_turn(state, ai_name: str = "AI"):
+def _advance_env_until_ai_turn(state, ai_name: str = "AI", use_heuristic: bool = False):
     """
     Advance the game state through all non-AI (opponent/environment) turns
     until it is the AI's turn again or the game is terminal.
 
-    Opponent actions are sampled via Boltzmann-weighted E_s heuristic
-    (excluding "q" quit). Uses rules._opponent_legal_actions and
-    rules._opponent_apply_action so the opponent is not constrained by hidden
-    card information (consistent with the imperfect-information model used
-    elsewhere in the codebase).
+    If use_heuristic is True (used in expansion), opponent actions are sampled
+    via Boltzmann-weighted E_s.  If False (used in rollouts), opponent actions
+    are sampled uniformly at random for speed.
     """
     safety = 0
     while not rules.is_terminal(state):
@@ -137,15 +135,16 @@ def _advance_env_until_ai_turn(state, ai_name: str = "AI"):
         actions = rules._opponent_legal_actions(state)
         actions = [a for a in actions if getattr(a, "type", None) != "q"]
         if not actions:
-            # Opponent has no legal moves — force terminal
             state.terminal = True
             state.terminal_reason = "no_legal_actions"
             break
 
-        action = _sample_opponent_action(state, actions)
+        if use_heuristic:
+            action = _sample_opponent_action(state, actions)
+        else:
+            action = random.choice(actions)
         ok = rules._opponent_apply_action(state, action)
         if ok is False:
-            # Action failed — force terminal to avoid infinite loop
             state.terminal = True
             state.terminal_reason = "apply_action_failed"
             break
@@ -279,8 +278,8 @@ class MCTSNode:
                 sim.terminal_reason = "apply_action_failed"
                 break
 
-            # Advance through opponent/environment turns
-            _advance_env_until_ai_turn(sim, ai_name=self.player_name)
+            # Advance through opponent/environment turns (random for speed)
+            _advance_env_until_ai_turn(sim, ai_name=self.player_name, use_heuristic=False)
 
         return evaluation.utility(sim, ai_player, opponent_player)
 
