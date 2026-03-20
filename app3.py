@@ -1,5 +1,4 @@
 import os
-import random
 import tempfile
 
 import pandas as pd
@@ -9,43 +8,13 @@ import streamlit.components.v1 as components
 import evaluation
 import game
 import rules
-import state
 from graph_ui import create_map
+from main2 import create_new_game, hand_summary, execute_ai_turn
 
 
 st.set_page_config(page_title="Ticket to Ride AI", layout="wide")
 
 _COLOURS = ["red", "blue", "green", "yellow", "black", "white", "orange", "pink"]
-
-
-def create_new_game():
-    """
-    Creates a fresh game state.
-    """
-    here = os.path.dirname(__file__)
-    map_path = os.path.join(here, "ttr_europe_map_data.csv")
-
-    # Graph / map
-    game_graph = game.graph()
-    game_graph.import_graph(map_path)
-
-    # Players
-    player_human = game.player("Human", "human")
-    player_ai = game.player("AI", "ai")
-    players = [player_human, player_ai]
-
-    # Deck
-    deck_of_trains = game.deck()
-    deck_of_trains.shuffle()
-
-    # Global state
-    current_game = state.state(game_graph, players, deck_of_trains)
-
-    # Give each player one destination ticket
-    for p in current_game.players:
-        p.give_ticket()
-
-    return current_game
 
 
 def ensure_session_state():
@@ -87,16 +56,6 @@ def route_text(player):
     if isinstance(player.ticket, dict):
         return f'{player.ticket["start"]} → {player.ticket["end"]} ({player.ticket["points"]} pts)'
     return str(player.ticket)
-
-
-def hand_summary(player):
-    summary = {c: 0 for c in _COLOURS}
-
-    for c in player.cards:
-        colour = c.get_colour() if hasattr(c, "get_colour") else c.colour
-        summary[colour] = summary.get(colour, 0) + 1
-
-    return summary
 
 
 def claimed_paths_for_player(current_game, player):
@@ -184,6 +143,11 @@ def _append_message(text: str):
         st.session_state.last_message = text
 
 
+def _append_messages(messages):
+    for msg in messages:
+        _append_message(msg)
+
+
 def deck_dataframe(deck):
     rows = [{"colour": c, "count": deck.get_colour_count(c)} for c in _COLOURS]
     return pd.DataFrame(rows)
@@ -221,66 +185,6 @@ def _describe_path(path_obj):
     return f"{pid} ({a} ↔ {b})"
 
 
-def execute_ai_turn(current_game, n_rollouts: int):
-    """
-    Execute exactly one AI turn automatically.
-
-    Preference:
-      - Monte Carlo from search.py
-      - fallback: random legal action
-    """
-    if current_game.terminal:
-        return
-    if current_game.current_player.name != "AI":
-        return
-
-    _append_message("AI is thinking…")
-
-    action = None
-    policy_used = None
-
-    try:
-        import search
-
-        action, _values = search.choose_best_action_monte_carlo(
-            current_game, n_simulations=int(n_rollouts)
-        )
-        if action is not None:
-            policy_used = "Monte Carlo"
-    except Exception as exc:
-        _append_message(f"Monte Carlo unavailable, fallback to random policy. ({exc})")
-        action = None
-
-    if action is None:
-        actions = [a for a in rules.legal_actions(current_game) if getattr(a, "type", None) != "q"]
-        action = random.choice(actions) if actions else None
-        if action is not None:
-            policy_used = "random"
-
-    if action is None:
-        _append_message("AI has no legal actions.")
-        return
-
-    if action.type == "d":
-        msg = "AI drew 1 card."
-    elif action.type == "c" and action.path is not None:
-        colour = action.path.get_colour()
-        needed = int(action.path.get_distance())
-        msg = f"AI claimed {_describe_path(action.path)} using {needed} {colour} card(s)."
-    else:
-        msg = f"AI played action: {getattr(action, 'type', '?')}"
-
-    ok = rules.apply_action(current_game, action)
-    if ok is False:
-        _append_message("AI action failed (unexpected illegal move).")
-        return
-
-    if policy_used:
-        _append_message(f"AI policy: {policy_used}.")
-    _append_message(msg)
-
-
-# ---------- Session ----------
 ensure_session_state()
 current_game = st.session_state.current_game
 active_player = get_active_player(current_game)
@@ -289,7 +193,6 @@ other_player = get_other_player(current_game)
 human = current_game.players[0]
 ai = current_game.players[1]
 
-# ---------- Sidebar ----------
 with st.sidebar:
     st.markdown("## 🎮 Controls")
     st.caption("Manage the current Ticket to Ride match")
@@ -320,7 +223,6 @@ with st.sidebar:
 st.markdown(
     """
     <style>
-      /* ---------- Main layout ---------- */
       .block-container {
         padding-top: 1.1rem;
         padding-bottom: 1.8rem;
@@ -329,7 +231,6 @@ st.markdown(
         max-width: 1450px;
       }
 
-      /* ---------- App background ---------- */
       .stApp {
         background:
           radial-gradient(circle at top left, rgba(59, 130, 246, 0.08), transparent 24%),
@@ -338,68 +239,32 @@ st.markdown(
         color: #f8fafc;
       }
 
-      /* ---------- Global typography ---------- */
       html, body, [class*="css"] {
         color: #f8fafc;
       }
 
       h1, h2, h3, h4, h5, h6 {
         color: #ffffff !important;
-        letter-spacing: 0.2px;
       }
 
       p, li, label {
         color: #e5e7eb !important;
       }
 
-      .stMarkdown,
-      .stText,
-      .stCaption,
-      .stAlert,
-      .stSubheader,
-      .stHeader {
-        color: #e5e7eb !important;
-      }
-
-      /* ---------- Generic content blocks ---------- */
-      div[data-testid="stVerticalBlock"] *,
-      div[data-testid="stHorizontalBlock"] * {
-        color: inherit;
-      }
-
-      /* ---------- Sidebar ---------- */
       section[data-testid="stSidebar"] {
         background: linear-gradient(180deg, #0f172a 0%, #111827 100%);
         border-right: 1px solid rgba(148, 163, 184, 0.18);
       }
 
-      section[data-testid="stSidebar"] .block-container {
-        padding-top: 1rem;
-        padding-left: 1rem;
-        padding-right: 1rem;
-      }
-
-      section[data-testid="stSidebar"] *,
-      section[data-testid="stSidebar"] label,
-      section[data-testid="stSidebar"] p,
-      section[data-testid="stSidebar"] span,
-      section[data-testid="stSidebar"] div {
+      section[data-testid="stSidebar"] * {
         color: #f8fafc !important;
       }
 
-      section[data-testid="stSidebar"] .stCaption {
-        color: #cbd5e1 !important;
-      }
-
-      /* ---------- Metrics ---------- */
       div[data-testid="stMetric"] {
         background: linear-gradient(180deg, rgba(15, 23, 42, 0.96), rgba(30, 41, 59, 0.88));
         border: 1px solid rgba(148, 163, 184, 0.18);
         border-radius: 16px;
         padding: 0.95rem 1rem;
-        box-shadow:
-          0 10px 24px rgba(0, 0, 0, 0.22),
-          inset 0 1px 0 rgba(255, 255, 255, 0.04);
       }
 
       div[data-testid="stMetric"] * {
@@ -407,26 +272,14 @@ st.markdown(
       }
 
       div[data-testid="stMetricLabel"] {
-        font-size: 0.92rem;
-        font-weight: 700;
         color: #cbd5e1 !important;
         opacity: 1 !important;
-        letter-spacing: 0.2px;
       }
 
       div[data-testid="stMetricValue"] {
-        font-size: 1.75rem;
-        font-weight: 800;
         color: #ffffff !important;
-        line-height: 1.15;
       }
 
-      div[data-testid="stMetricDelta"] {
-        color: #fde68a !important;
-        font-weight: 700;
-      }
-
-      /* ---------- Buttons ---------- */
       .stButton > button {
         width: 100%;
         border-radius: 12px;
@@ -434,31 +287,6 @@ st.markdown(
         background: linear-gradient(180deg, #1e293b 0%, #0f172a 100%);
         color: #ffffff !important;
         font-weight: 800;
-        padding: 0.58rem 0.95rem;
-        transition: all 0.18s ease;
-        box-shadow: 0 6px 16px rgba(0, 0, 0, 0.22);
-      }
-
-      .stButton > button:hover {
-        border-color: rgba(251, 191, 36, 0.72);
-        color: #fff7cc !important;
-        transform: translateY(-1px);
-        box-shadow: 0 10px 20px rgba(0, 0, 0, 0.26);
-      }
-
-      .stButton > button:disabled {
-        opacity: 0.5;
-        color: #cbd5e1 !important;
-      }
-
-      /* ---------- Inputs ---------- */
-      .stCheckbox label,
-      .stSelectbox label,
-      .stSlider label,
-      .stNumberInput label,
-      .stTextInput label {
-        color: #f8fafc !important;
-        font-weight: 700 !important;
       }
 
       .stSelectbox > div[data-baseweb="select"] > div {
@@ -468,86 +296,14 @@ st.markdown(
         border-radius: 12px;
       }
 
-      .stSelectbox div,
-      .stSelectbox span,
-      .stSelectbox input {
-        color: #ffffff !important;
-      }
-
-      .stSlider [role="slider"] {
-        box-shadow: 0 0 0 4px rgba(251, 191, 36, 0.14);
-      }
-
-      /* ---------- Dataframes ---------- */
-      div[data-testid="stDataFrame"] {
-        border: 1px solid rgba(148, 163, 184, 0.16);
-        border-radius: 14px;
-        overflow: hidden;
-        background: rgba(15, 23, 42, 0.82);
-      }
-
       div[data-testid="stDataFrame"] * {
         color: #f8fafc !important;
-      }
-
-      /* ---------- Tables ---------- */
-      table, thead, tbody, tr, td, th {
-        color: #f8fafc !important;
-      }
-
-      th {
-        background: rgba(30, 41, 59, 0.95) !important;
-      }
-
-      td {
-        background: rgba(15, 23, 42, 0.78) !important;
-      }
-
-      /* ---------- Expanders ---------- */
-      details {
-        background: linear-gradient(180deg, rgba(15, 23, 42, 0.8), rgba(17, 24, 39, 0.7));
-        border: 1px solid rgba(148, 163, 184, 0.14);
-        border-radius: 14px;
-        padding: 0.15rem 0.35rem 0.35rem 0.35rem;
       }
 
       details * {
         color: #f8fafc !important;
       }
 
-      summary {
-        color: #ffffff !important;
-        font-weight: 700 !important;
-      }
-
-      .streamlit-expanderHeader {
-        color: #ffffff !important;
-      }
-
-      /* ---------- Alerts ---------- */
-      div[data-baseweb="notification"] {
-        border-radius: 14px;
-      }
-
-      div[data-baseweb="notification"] * {
-        color: #f8fafc !important;
-      }
-
-      /* ---------- Divider ---------- */
-      hr {
-        border: none;
-        height: 1px;
-        background: linear-gradient(
-          90deg,
-          transparent,
-          rgba(203, 213, 225, 0.32),
-          transparent
-        );
-        margin-top: 0.8rem;
-        margin-bottom: 0.8rem;
-      }
-
-      /* ---------- Badges ---------- */
       .ttr-badge {
         display: inline-flex;
         align-items: center;
@@ -556,13 +312,9 @@ st.markdown(
         border-radius: 999px;
         font-weight: 800;
         font-size: 0.84rem;
-        letter-spacing: 0.2px;
         border: 1px solid rgba(148, 163, 184, 0.24);
         background: linear-gradient(180deg, rgba(15, 23, 42, 0.95), rgba(30, 41, 59, 0.85));
         color: #ffffff !important;
-        box-shadow:
-          inset 0 1px 0 rgba(255, 255, 255, 0.05),
-          0 4px 12px rgba(0, 0, 0, 0.2);
       }
 
       .ttr-badge-ai {
@@ -574,31 +326,11 @@ st.markdown(
         border-color: rgba(34, 197, 94, 0.52);
         color: #dcfce7 !important;
       }
-
-      /* ---------- Small helper panels ---------- */
-      .ttr-panel {
-        background: linear-gradient(180deg, rgba(15, 23, 42, 0.88), rgba(30, 41, 59, 0.76));
-        border: 1px solid rgba(148, 163, 184, 0.16);
-        border-radius: 16px;
-        padding: 1rem;
-        box-shadow: 0 8px 24px rgba(0,0,0,0.18);
-        color: #f8fafc !important;
-      }
-
-      .ttr-panel * {
-        color: #f8fafc !important;
-      }
-
-      /* ---------- Captions / helper text ---------- */
-      .stCaption {
-        color: #d1d5db !important;
-      }
     </style>
     """,
     unsafe_allow_html=True,
 )
 
-# ---------- Header ----------
 header = st.container()
 with header:
     c_title, c_status = st.columns([1.4, 1.0])
@@ -629,7 +361,6 @@ with header:
     if st.session_state.last_message:
         st.warning(st.session_state.last_message)
 
-# ---------- Main layout ----------
 left, center, right = st.columns([1.05, 1.9, 1.05], gap="large")
 
 with left:
@@ -706,7 +437,6 @@ with right:
         else:
             st.caption("No routes claimed yet.")
 
-# ---------- Selected path panel ----------
 st.divider()
 st.subheader("Selected Route")
 
@@ -735,7 +465,6 @@ if selected is not None:
 else:
     st.info("Select a path to inspect its details.")
 
-# ---------- Actions ----------
 st.divider()
 st.subheader("Actions")
 
@@ -765,7 +494,8 @@ with a2:
             st.rerun()
 
         _append_message("Human drew 1 card.")
-        execute_ai_turn(current_game, n_rollouts=int(rollouts))
+        ai_messages = execute_ai_turn(current_game, n_rollouts=int(rollouts))
+        _append_messages(ai_messages)
         st.rerun()
 
 with a3:
@@ -789,10 +519,10 @@ with a3:
 
         _append_message(f"Human claimed {_describe_path(path_obj)} using {needed} {colour} card(s).")
         st.session_state.selected_path_id = None
-        execute_ai_turn(current_game, n_rollouts=int(rollouts))
+        ai_messages = execute_ai_turn(current_game, n_rollouts=int(rollouts))
+        _append_messages(ai_messages)
         st.rerun()
 
-# ---------- Evaluation ----------
 st.divider()
 st.subheader("Evaluation")
 
@@ -821,7 +551,6 @@ try:
 except Exception as exc:
     st.warning(f"Utility breakdown not available yet: {exc}")
 
-# ---------- Deck / debug ----------
 if show_debug:
     st.divider()
     st.subheader("Debug Panels")
@@ -837,10 +566,10 @@ if show_debug:
         st.write("Terminal:", getattr(current_game, "terminal", False))
         st.write("Active player:", current_game.current_player.name)
 
-# ---------- Auto-run AI turn on refresh ----------
 if active_player.name == "AI" and not current_game.terminal:
     last = st.session_state.get("ai_last_executed_round", None)
     if last != current_game.current_round:
         st.session_state.ai_last_executed_round = current_game.current_round
-        execute_ai_turn(current_game, n_rollouts=int(rollouts))
+        ai_messages = execute_ai_turn(current_game, n_rollouts=int(rollouts))
+        _append_messages(ai_messages)
         st.rerun()
