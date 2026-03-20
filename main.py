@@ -105,9 +105,9 @@ def main():
     # Two-player simplified setup: one AI placeholder (random) and one human.
     player_monte = game.player("Monte Carlo", "monte_carlo")  # placeholder until MCTS
     player_ab = game.player("Alpha Beta", "alpha_beta_pruning") 
-    player_human1 = game.player("Human 1", "human")
+    player_human = game.player("Edda", "monte_carlo")
     # player_human2 = game.player("Human 2", "human")
-    players = [player_monte, player_ab] #, player_human1] # , player_human2]
+    players = [player_monte, player_human] #, player_human1] # , player_human2]
 
     # Defensive reset: ensures a fresh start even if this file is run multiple times
     # in the same Python process / interactive session.

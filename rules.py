@@ -9,7 +9,7 @@ import evaluation
 # ── Programmer-controlled knob ────────────────────────────────────────────────
 # Maximum search depth for Alpha-Beta Pruning. At depth 0 (leaf not yet terminal)
 # the heuristic E_s is used instead of a full rollout.
-AB_DEPTH: int = 5
+AB_DEPTH: int = 1
 # ─────────────────────────────────────────────────────────────────────────────
 
 
@@ -103,13 +103,9 @@ def _draw_one_card(state):
 
 
 def draw_card(state):
-    """Draw 2 cards for the current player (standard Ticket to Ride rules).
-    Returns True if at least 1 card was drawn, False if deck and discard are both empty."""
-    drew_any = False
-    for _ in range(2):
-        if _draw_one_card(state):
-            drew_any = True
-    return drew_any
+    """Draw 1 card for the current player.
+    Returns True if a card was drawn, False if deck and discard are both empty."""
+    return _draw_one_card(state)
 
 def apply_action(state, action):
     """Apply one action for the current player and advance the turn counter."""
@@ -255,13 +251,98 @@ def monte_carlo_decide_action(state):
     # Fallback: if search returns nothing (e.g. no actions), draw a card.
     return best_action if best_action is not None else Action("d")
 
+def _opponent_legal_actions(state):
+    """
+    Legal actions for the opponent assuming they have all possible cards.
+    Only train count and path occupation are checked — card constraints are ignored.
+    This implements imperfect information: the AI does not see the opponent's hand
+    and instead assumes the opponent can make the best move with any cards available.
+    """
+    possible_actions = []
+    player = state.current_player
+
+    can_draw = (state.deck.get_card_count() > 0) or (len(state.discard) > 0)
+    if can_draw:
+        possible_actions.append(Action("d"))
+
+    for path in state.graph.paths:
+        if path.occupation:
+            continue
+        if player.trains < path.distance:
+            continue
+        # No card check — assume opponent has whatever cards they need.
+        possible_actions.append(Action("c", path))
+
+    return possible_actions
+
+
+def _opponent_claim_path(state, path, chosen_colour=None):
+    """
+    Claim a path for the opponent without requiring cards in hand.
+    The opponent is assumed to have all possible cards, so we skip the
+    card-matching check and just deduct trains and mark occupation.
+    """
+    player = state.current_player
+    train_count = path.distance
+
+    real_path = None
+    for p in state.graph.paths:
+        if p.get_path_id() == path.get_path_id():
+            real_path = p
+            break
+    if real_path is None:
+        return False
+    if real_path.occupation:
+        return False
+
+    real_path.occupation = player.name
+    player.trains -= train_count
+    player.score += evaluation.points_for_path_length(train_count)
+
+    if (not state.endgame_triggered) and player.trains <= 2:
+        state.endgame_triggered = True
+        state.final_turns_remaining = max(0, len(state.players) - 1)
+
+    return path
+
+
+def _opponent_apply_action(state, action):
+    """Apply an action for the opponent (no card check on claims)."""
+    endgame_was_triggered = state.endgame_triggered
+    if action.type == "q":
+        state.terminal = True
+        state.terminal_reason = "quit"
+        return True
+    if action.type == "d":
+        ok = draw_card(state)
+        if ok is False:
+            state.terminal = True
+            state.terminal_reason = "deck_empty"
+    elif action.type == "c":
+        result = _opponent_claim_path(state, action.path)
+        if result is False:
+            return False
+    else:
+        return False
+    state.current_round += 1
+    if state.endgame_triggered and endgame_was_triggered:
+        state.final_turns_remaining = max(0, state.final_turns_remaining - 1)
+        if state.final_turns_remaining == 0:
+            state.terminal = True
+            state.terminal_reason = "endgame"
+    return True
+
+
 def _ab_search(sim_state, depth, alpha, beta, maximizing, our_name, opp_name):
     """
-    Recursive Alpha-Beta search.
+    Recursive Alpha-Beta search with imperfect information.
 
     our_name  : name of the player we are maximising for.
     opp_name  : name of the opponent.
     maximizing: True when it is our_name's turn in this node.
+
+    The opponent's hand is hidden. On opponent turns, we assume they can
+    claim any route they have enough trains for (regardless of cards held).
 
     Returns a scalar value (higher = better for our_name).
     """
@@ -276,7 +357,11 @@ def _ab_search(sim_state, depth, alpha, beta, maximizing, our_name, opp_name):
         return evaluation.E_s(sim_state, our)
 
     # Generate children ───────────────────────────────────────────────────────
-    actions = [a for a in legal_actions(sim_state) if a.type != "q"]
+    if maximizing:
+        actions = [a for a in legal_actions(sim_state) if a.type != "q"]
+    else:
+        actions = [a for a in _opponent_legal_actions(sim_state) if a.type != "q"]
+
     if not actions:
         # No moves left — treat as terminal.
         our  = next(p for p in sim_state.players if p.name == our_name)
@@ -299,7 +384,7 @@ def _ab_search(sim_state, depth, alpha, beta, maximizing, our_name, opp_name):
         value = float("inf")
         for action in actions:
             child = copy.deepcopy(sim_state)
-            apply_action(child, action)
+            _opponent_apply_action(child, action)
             child_max = (child.current_player.name == our_name)
             v = _ab_search(child, depth - 1, alpha, beta, child_max, our_name, opp_name)
             value = min(value, v)
