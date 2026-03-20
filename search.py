@@ -1,9 +1,10 @@
 """
-Monte Carlo Tree Search (MCTS) for the AI player.
+Monte Carlo Tree Search (MCTS) with opponent-as-environment approximation.
 
-This module implements full MCTS with UCB1 selection, expansion, simulation
-(random rollout), and backpropagation. Used ONLY when the current player is
-the one whose name is exactly "AI".
+This module implements MCTS with UCB1 selection, expansion, simulation
+(random rollout), and backpropagation. The tree branches only on AI decisions;
+opponent turns are treated as stochastic environment transitions (sampled from
+a simple policy) rather than as decision nodes in the tree.
 """
 
 from __future__ import annotations
@@ -20,6 +21,8 @@ import rules
 N_SIMULATIONS: int = 1000          # Total MCTS iterations (tree walks)
 EXPLORATION_CONSTANT: float = 1.41  # C in UCB1 = sqrt(2) ≈ 1.41
 MAX_ROLLOUT_STEPS: int = 10_000   # Safety cap on rollout depth
+OPPONENT_TEMPERATURE: float = 1.0   # Boltzmann temperature for opponent policy
+                                     # lower → more greedy, higher → more random
 # ─────────────────────────────────────────────────────────────────────────────
 
 
@@ -73,6 +76,85 @@ def _action_key(action) -> Tuple[Any, ...]:
         if path_id is None and hasattr(a_path, "path_id"):
             path_id = getattr(a_path, "path_id", None)
     return (a_type, path_id, repr(action))
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+#  Opponent-as-environment helper
+# ═══════════════════════════════════════════════════════════════════════════════
+
+def _sample_opponent_action(state, actions):
+    """
+    Pick an opponent action using Boltzmann (softmax) sampling weighted by E_s.
+
+    For each candidate action, we clone the state, apply the action, and
+    evaluate E_s from the opponent's perspective.  Actions that leave the
+    opponent in a stronger position are sampled more often.
+
+    OPPONENT_TEMPERATURE controls the greediness:
+        → 0  : always pick the best action (greedy)
+        → ∞  : uniform random (ignore heuristic)
+    """
+    if len(actions) == 1:
+        return actions[0]
+
+    opponent_name = state.current_player.name
+
+    scores: List[float] = []
+    for action in actions:
+        child = clone_state(state)
+        rules._opponent_apply_action(child, action)
+        opp_in_child = next(p for p in child.players if p.name == opponent_name)
+        scores.append(evaluation.E_s(child, opp_in_child))
+
+    # Boltzmann weights (shift by max for numerical stability)
+    temp = max(OPPONENT_TEMPERATURE, 1e-9)
+    max_s = max(scores)
+    weights = [math.exp((s - max_s) / temp) for s in scores]
+
+    return random.choices(actions, weights=weights, k=1)[0]
+
+
+def _advance_env_until_ai_turn(state, ai_name: str = "AI"):
+    """
+    Advance the game state through all non-AI (opponent/environment) turns
+    until it is the AI's turn again or the game is terminal.
+
+    Opponent actions are sampled via Boltzmann-weighted E_s heuristic
+    (excluding "q" quit). Uses rules._opponent_legal_actions and
+    rules._opponent_apply_action so the opponent is not constrained by hidden
+    card information (consistent with the imperfect-information model used
+    elsewhere in the codebase).
+    """
+    safety = 0
+    while not rules.is_terminal(state):
+        current = getattr(state, "current_player", None)
+        if current is None:
+            break
+        if getattr(current, "name", None) == ai_name:
+            break  # back to AI's turn
+
+        # Get opponent legal actions (no card constraint) and exclude quit
+        actions = rules._opponent_legal_actions(state)
+        actions = [a for a in actions if getattr(a, "type", None) != "q"]
+        if not actions:
+            # Opponent has no legal moves — force terminal
+            state.terminal = True
+            state.terminal_reason = "no_legal_actions"
+            break
+
+        action = _sample_opponent_action(state, actions)
+        ok = rules._opponent_apply_action(state, action)
+        if ok is False:
+            # Action failed — force terminal to avoid infinite loop
+            state.terminal = True
+            state.terminal_reason = "apply_action_failed"
+            break
+
+        safety += 1
+        if safety > 200:
+            state.terminal = True
+            state.terminal_reason = "env_advance_safety_limit"
+            break
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -140,11 +222,15 @@ class MCTSNode:
     def expand(self) -> "MCTSNode":
         """
         Expand one untried action: pop it, apply it to a cloned state,
-        create a child node, and return it.
+        advance through opponent/environment turns, then create a child node.
+
+        The child node's state is always either terminal or an AI-to-act state.
         """
         action = self.untried_actions.pop()
         child_state = clone_state(self.state)
         rules.apply_action(child_state, action)
+        # Advance past opponent turns so the child is an AI-turn or terminal state.
+        _advance_env_until_ai_turn(child_state, ai_name=self.player_name)
         child_node = MCTSNode(
             state=child_state,
             parent=self,
@@ -158,6 +244,11 @@ class MCTSNode:
         """
         Run a random playout from this node's state to a terminal state
         and return the utility from the AI's perspective.
+
+        The rollout respects the opponent-as-environment abstraction:
+          1. Choose a random AI action (excluding "q") and apply it.
+          2. Advance through opponent/environment turns.
+          3. Repeat until terminal.
         """
         sim = clone_state(self.state)
         ai_player = next((p for p in sim.players if p.name == self.player_name), None)
@@ -169,22 +260,27 @@ class MCTSNode:
         while not rules.is_terminal(sim):
             steps += 1
             if steps > MAX_ROLLOUT_STEPS:
-                setattr(sim, "terminal", True)
-                setattr(sim, "terminal_reason", "rollout_step_limit")
+                sim.terminal = True
+                sim.terminal_reason = "rollout_step_limit"
                 break
 
+            # AI's turn: pick a random legal action (exclude "q")
             actions = rules.legal_actions(sim)
+            actions = [a for a in actions if getattr(a, "type", None) != "q"]
             if not actions:
-                setattr(sim, "terminal", True)
-                setattr(sim, "terminal_reason", "no_legal_actions")
+                sim.terminal = True
+                sim.terminal_reason = "no_legal_actions"
                 break
 
             action = random.choice(actions)
             ok = rules.apply_action(sim, action)
             if ok is False:
-                setattr(sim, "terminal", True)
-                setattr(sim, "terminal_reason", "apply_action_failed")
+                sim.terminal = True
+                sim.terminal_reason = "apply_action_failed"
                 break
+
+            # Advance through opponent/environment turns
+            _advance_env_until_ai_turn(sim, ai_name=self.player_name)
 
         return evaluation.utility(sim, ai_player, opponent_player)
 

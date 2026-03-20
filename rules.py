@@ -241,13 +241,13 @@ def monte_carlo_decide_action(state):
         state, n_simulations=search.N_SIMULATIONS
     )
     if action_win_stats:
-        print("  Monte Carlo rollout results:")
+        print("  MCTS results:")
         for a, w, sims, avg in action_win_stats:
             label = a.type
             if a.type == "c" and a.path is not None:
                 label = f"claim {a.path.path_id}"
             marker = " <-- chosen" if a is best_action else ""
-            print(f"    {label}: wins/explorations = {w}/{sims} = {w/sims:.2f}  (avg utility {avg:.2f}){marker}")
+            print(f"    {label}: visits={sims}  avg_utility={avg:.2f}{marker}")
     # Fallback: if search returns nothing (e.g. no actions), draw a card.
     return best_action if best_action is not None else Action("d")
 
@@ -447,7 +447,7 @@ def decide_action(state):
     
     if player.type == "monte_carlo":
         action = monte_carlo_decide_action(state)
-        print("Action chosen by Monte Carlo: ", action)
+        print("Action chosen by MCTS: ", action)
         return action
     
     if player.type == "alpha_beta_pruning":
