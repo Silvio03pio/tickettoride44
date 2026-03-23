@@ -6,3 +6,8 @@ Tasks
 - Make function legal actions(state) returns all legal actions as list of type action
 - Make function decide(state, actions)
 - FIX: gray is now a colour and no gray trains
+
+Hakon:
+- Grey error
+- Improve UI
+- Maybe Improved algorithm

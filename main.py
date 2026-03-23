@@ -1,152 +1,181 @@
-
-import os
-import csv
-import random
 import time
 
-import game
 import rules
-import state
 import evaluation
-
-def _here_path(filename):
-    return os.path.join(os.path.dirname(__file__), filename)
-
-
-def _count_hand_by_colour(cards):
-    counts = {c: 0 for c in game.COLOURS}
-    for card in cards:
-        colour = card.colour if hasattr(card, "colour") else card.get_colour()
-        if colour in counts:
-            counts[colour] += 1
-    return counts
+from main2 import (
+    create_new_game,
+    hand_summary,
+    execute_ai_turn,
+    _format_hand,
+    _print_turn_header,
+    _print_final_scoring,
+)
 
 
-def _format_hand(cards):
-    counts = _count_hand_by_colour(cards)
-    parts = [f"{c}:{n}" for c, n in counts.items() if n > 0]
-    return "  ".join(parts) if parts else "(empty)"
+_COLOURS = ["red", "blue", "green", "yellow", "black", "white", "orange", "pink"]
+
+DEFAULT_ROLLOUTS = 50
 
 
-def _load_tickets(csv_path):
-    tickets = []
-    with open(csv_path, newline="", encoding="utf-8") as f:
-        reader = csv.DictReader(f)
-        for row in reader:
-            tickets.append({"start": row["city_a"], "end": row["city_b"], "points": int(row["points"])})
-    return tickets
+def route_text(player):
+    if player.ticket is None:
+        return "No ticket assigned"
+    if isinstance(player.ticket, dict):
+        return f'{player.ticket["start"]} -> {player.ticket["end"]} ({player.ticket["points"]} pts)'
+    return str(player.ticket)
 
 
-def _deal_starting_hands(game_state, cards_each=4):
-    for _ in range(cards_each):
-        for p in game_state.players:
-            if not game_state.deck.cards:
-                game_state.terminal = True
-                game_state.terminal_reason = "deck_empty"
-                return
-            p.cards.append(game_state.deck.cards.pop(0))
+def print_scoreboard(current_game):
+    human = current_game.players[0]
+    ai = current_game.players[1]
+    print()
+    print("-" * 50)
+    print(f"  Human  | Score: {human.score:>3}  Trains: {human.trains:>2}  Cards: {len(human.cards):>2}")
+    print(f"  AI     | Score: {ai.score:>3}  Trains: {ai.trains:>2}  Cards: {len(ai.cards):>2}")
+    print(f"  Deck   | {current_game.deck.get_card_count()} cards left")
+    unclaimed = sum(1 for p in current_game.graph.get_paths() if p.get_occupation() is None)
+    print(f"  Routes | {unclaimed} unclaimed")
+    print("-" * 50)
 
 
-def _print_turn_header(game_state):
-    p = game_state.current_player
-    print("\n" + "=" * 72)
-    print(f"Turn {game_state.current_round} | Current player: {p.name} ({p.type})")
-    print("-" * 72)
-    print(f"Score: {p.score} | Trains left: {p.trains}")
-    if p.ticket is not None:
-        print(f"Ticket: {p.ticket['start']} -> {p.ticket['end']} ({p.ticket['points']} pts)")
+def print_hand(player):
+    counts = hand_summary(player)
+    parts = [f"  {c}: {n}" for c, n in counts.items() if n > 0]
+    if parts:
+        print("Your hand:")
+        for part in parts:
+            print(part)
     else:
-        print("Ticket: (none)")
-    print(f"Hand: {_format_hand(p.cards)}")
-    print("=" * 72)
+        print("Your hand: (empty)")
 
 
-def _print_actions(game_state, actions):
-    print("Available actions:")
-    for a in actions:
-        if a.type == "q":
-            print("- q: Quit / end the game now (final scoring immediately)")
-        elif a.type == "d":
-            print("- d: Draw 1 train card from the deck")
-        elif a.type == "c" and a.path is not None:
-            path = a.path
-            start = path.get_start_node().name
-            end = path.get_end_node().name
-            print(f"- c: Claim path {path.path_id} | {start} <-> {end} | len {path.distance} | {path.colour}")
+def print_claimed_routes(current_game, player):
+    rows = []
+    for p in current_game.graph.get_paths():
+        if p.get_occupation() == player.name:
+            rows.append(p)
+    if not rows:
+        print(f"  {player.name} has no claimed routes yet.")
+        return
+    print(f"  {player.name}'s claimed routes:")
+    for p in rows:
+        print(f"    {p.get_path_id()}: {p.get_start_node().name} <-> {p.get_end_node().name} "
+              f"| {p.get_colour()} | len {p.get_distance()}")
 
 
-def _print_final_scoring(game_state, ai_index=0, player_times=None):
-    ai = game_state.players[ai_index]
-    opp = game_state.players[1 - ai_index]
-    breakdown = evaluation.utility_breakdown(game_state, ai, opp, longest_bonus=game_state.longest_path_points)
+def human_turn(current_game, rollouts):
+    player = current_game.current_player
+    _print_turn_header(current_game)
+    print_hand(player)
+    print(f"  Ticket: {route_text(player)}")
+    print()
 
-    print("\n" + "#" * 72)
-    print("FINAL SCORING")
-    print(f"Terminal reason: {game_state.terminal_reason}")
-    print("-" * 72)
-    print(f"{ai.name} total: {breakdown['AI']['total']} (paths {breakdown['AI']['path_points']}, ticket {breakdown['AI']['ticket_points']}, longest {breakdown['AI']['longest_bonus']})")
-    print(f"{opp.name} total: {breakdown['Opponent']['total']} (paths {breakdown['Opponent']['path_points']}, ticket {breakdown['Opponent']['ticket_points']}, longest {breakdown['Opponent']['longest_bonus']})")
-    print("-" * 72)
-    print(f"Utility U(s) = {breakdown['utility']}  (AI - Opponent)")
-    if player_times:
-        print("-" * 72)
-        for name, total in player_times.items():
-            print(f"Total decision time for {name}: {total:.2f}s")
-    print("#" * 72 + "\n")
+    actions = rules.legal_actions(current_game)
+    claimable = [a for a in actions if a.type == "c" and a.path is not None]
+
+    while True:
+        choice = input("Choose action: (d)raw, (c)laim, (q)uit, (h)and, (s)core, (r)outes: ").strip().lower()
+
+        if choice == "d":
+            if any(a.type == "d" for a in actions):
+                ok = rules.apply_action(current_game, rules.Action("d"))
+                if ok is False:
+                    print("Draw failed (deck empty).")
+                    continue
+                print("You drew 1 card.")
+                return
+            print("Cannot draw (deck is empty).")
+            continue
+
+        if choice == "q":
+            if any(a.type == "q" for a in actions):
+                rules.apply_action(current_game, rules.Action("q"))
+                return
+            print("Quit is not available right now.")
+            continue
+
+        if choice == "c":
+            if not claimable:
+                print("No claimable routes (need enough matching cards and trains).")
+                continue
+
+            print("\nClaimable routes:")
+            for a in claimable:
+                p = a.path
+                start = p.get_start_node().name
+                end = p.get_end_node().name
+                print(f"  {p.path_id}: {start} <-> {end} | {p.colour} | len {p.distance}")
+
+            path_id = input("Enter path id to claim (e.g. R015): ").strip().upper()
+            import game
+            selected_path = game.get_path_from_id(current_game.graph, path_id)
+            if selected_path is None:
+                print("Unknown path id.")
+                continue
+            if not any(a.path is selected_path for a in claimable):
+                print("That path is not claimable right now.")
+                continue
+
+            ok = rules.apply_action(current_game, rules.Action("c", selected_path))
+            if ok is False:
+                print("Claim failed.")
+                continue
+            print(f"Claimed {path_id} ({selected_path.get_start_node().name} <-> {selected_path.get_end_node().name})!")
+            return
+
+        if choice == "h":
+            print_hand(player)
+            continue
+
+        if choice == "s":
+            print_scoreboard(current_game)
+            continue
+
+        if choice == "r":
+            print_claimed_routes(current_game, current_game.players[0])
+            print_claimed_routes(current_game, current_game.players[1])
+            continue
+
+        print("Invalid input. Type d, c, q, h, s, or r.")
+
+
+def ai_turn(current_game, rollouts):
+    _print_turn_header(current_game)
+    messages = execute_ai_turn(current_game, n_rollouts=rollouts)
+    for msg in messages:
+        print(f"  {msg}")
 
 
 def main():
+    print("=" * 60)
+    print("  TICKET TO RIDE — Human vs AI  (Terminal Mode)")
+    print("=" * 60)
 
-    random.seed()
+    current_game = create_new_game()
+    human = current_game.players[0]
+    ai = current_game.players[1]
 
-    test_graph = game.graph()
-    test_graph.import_graph(_here_path("ttr_europe_map_data.csv"))
+    print(f"\nHuman ticket: {route_text(human)}")
+    print(f"AI ticket:    {route_text(ai)}")
+    print_scoreboard(current_game)
 
-    # Two-player simplified setup: one AI placeholder (random) and one human.
-    player_monte = game.player("Monte Carlo", "monte_carlo")  # placeholder until MCTS
-    player_ab = game.player("Alpha Beta", "alpha_beta_pruning") 
-    player_human = game.player("Edda", "monte_carlo")
-    # player_human2 = game.player("Human 2", "human")
-    players = [player_monte, player_human] #, player_human1] # , player_human2]
+    rollouts = DEFAULT_ROLLOUTS
 
-    # Defensive reset: ensures a fresh start even if this file is run multiple times
-    # in the same Python process / interactive session.
-    for p in players:
-        p.cards = []
-        p.ticket = None
-        p.score = 0
-        p.trains = 44
+    while not current_game.terminal:
+        active = current_game.current_player
 
-    deck_of_trains = game.deck()
-    deck_of_trains.shuffle()
+        if active.name == "Human":
+            human_turn(current_game, rollouts)
+        else:
+            ai_turn(current_game, rollouts)
 
-    test_game = state.state(test_graph, players, deck_of_trains)
+        print_scoreboard(current_game)
 
-    # Destination tickets: 1 per player, secret (we only show current player's ticket in terminal).
-    tickets = _load_tickets(_here_path("route_cards.csv"))
-    random.shuffle(tickets)
-    for i, p in enumerate(test_game.players):
-        # Copy dict so it can't be shared/mutated across players/runs
-        p.ticket = dict(tickets[i % len(tickets)])
+        if getattr(current_game, "terminal_reason", None):
+            print(f"\n*** Game ended: {current_game.terminal_reason} ***")
 
-    # Initial hands: empty (per simplified rules). Players must draw to get cards.
-
-
-    player_times = {p.name: 0.0 for p in test_game.players}
-
-    while not rules.is_terminal(test_game):
-        _print_turn_header(test_game)
-        actions = rules.legal_actions(test_game)
-        _print_actions(test_game, actions)
-        current_name = test_game.current_player.name
-        t0 = time.time()
-        chosen_action = rules.decide_action(test_game)
-        elapsed = time.time() - t0
-        player_times[current_name] += elapsed
-        print(f"  [{current_name} decided in {elapsed:.2f}s]")
-        rules.apply_action(test_game, chosen_action)
-
-    _print_final_scoring(test_game, ai_index=0, player_times=player_times)
+    # Final scoring
+    _print_final_scoring(current_game, ai_index=1)
 
 
 if __name__ == "__main__":

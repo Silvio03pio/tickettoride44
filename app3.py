@@ -10,10 +10,7 @@ import game
 import rules
 from graph_ui import create_map
 
-try:
-    from main import create_new_game, hand_summary, execute_ai_turn
-except ImportError:
-    from main2 import create_new_game, hand_summary, execute_ai_turn
+from main2 import create_new_game, hand_summary, execute_ai_turn
 
 
 st.set_page_config(page_title="Ticket to Ride AI", layout="wide")
