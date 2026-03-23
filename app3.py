@@ -113,6 +113,20 @@ def count_matching_cards(player, colour):
 def can_claim_path(player, path):
     needed = path.get_distance()
     colour = path.get_colour()
+
+    # Grey paths accept any single colour — find the best one the player has.
+    if colour == "gray":
+        best_colour, best_count = None, 0
+        for c in _COLOURS:
+            cnt = count_matching_cards(player, c)
+            if cnt >= needed and cnt > best_count:
+                best_count, best_colour = cnt, c
+        if best_colour is not None:
+            return True, best_count, needed, best_colour
+        # Not enough of any single colour
+        best_available = max(count_matching_cards(player, c) for c in _COLOURS)
+        return False, best_available, needed, "gray"
+
     available = count_matching_cards(player, colour)
     return available >= needed, available, needed, colour
 
@@ -383,7 +397,8 @@ st.markdown(
         padding: 6px !important;
       }
 
-      div[role="option"] {
+      div[role="option"],
+      div[role="option"] * {
         background: #ffffff !important;
         color: #111827 !important;
         border-radius: 8px !important;
@@ -670,10 +685,12 @@ with a3:
         st.session_state.last_message = None
 
         path_obj = selected["obj"]
-        colour = path_obj.get_colour()
-        needed = int(path_obj.get_distance())
+        _, _, needed, colour = can_claim_path(active_player, path_obj)
+        needed = int(needed)
 
-        ok = rules.apply_action(current_game, rules.Action("c", path_obj))
+        # For grey paths, pass the chosen colour so the right cards are spent.
+        claim_colour = colour if path_obj.get_colour() == "gray" else None
+        ok = rules.apply_action(current_game, rules.Action("c", path_obj, colour=claim_colour))
         if ok is False:
             _set_message("Claim failed (not enough cards/trains, or route already claimed).")
             st.rerun()
