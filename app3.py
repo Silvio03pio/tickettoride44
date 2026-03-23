@@ -234,29 +234,8 @@ with st.sidebar:
         reset_game_state()
         st.rerun()
 
-    st.session_state.show_debug = st.checkbox(
-        "Show debug panels",
-        value=st.session_state.show_debug,
-    )
-
-    st.session_state.rollouts = st.slider(
-        "AI rollouts per move",
-        min_value=10,
-        max_value=200,
-        value=st.session_state.rollouts,
-        step=10,
-    )
-
-    st.session_state.show_only_claimable_routes = st.checkbox(
-        "Show only claimable routes",
-        value=st.session_state.show_only_claimable_routes,
-    )
-
-    rollouts = st.session_state.rollouts
     show_debug = st.session_state.show_debug
-
-    st.divider()
-    st.caption("Tip: use the search box or route ID to find a path quickly.")
+    rollouts = st.session_state.rollouts
 
 st.markdown(
     """
@@ -363,59 +342,91 @@ st.markdown(
 
       /* Closed select */
       .stSelectbox > div[data-baseweb="select"] > div {
-        background: #ffffff !important;
-        color: #111827 !important;
-        border: 1px solid #d1d5db !important;
+        background: #1e293b !important;
+        color: #f8fafc !important;
+        border: 1px solid rgba(148, 163, 184, 0.3) !important;
         border-radius: 12px !important;
         min-height: 46px;
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.16);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
       }
 
       .stSelectbox > div[data-baseweb="select"] > div:hover {
-        border: 1px solid #94a3b8 !important;
+        border: 1px solid rgba(251, 191, 36, 0.6) !important;
       }
 
       .stSelectbox > div[data-baseweb="select"] span {
-        color: #111827 !important;
+        color: #f8fafc !important;
         font-weight: 600 !important;
       }
 
       .stSelectbox > div[data-baseweb="select"] input {
-        color: #111827 !important;
+        color: #f8fafc !important;
       }
 
       .stSelectbox > div[data-baseweb="select"] svg {
-        fill: #111827 !important;
+        fill: #f8fafc !important;
       }
 
-      /* Open dropdown */
-      div[role="listbox"] {
-        background: #ffffff !important;
-        border: 1px solid #d1d5db !important;
+      /* Open dropdown — BaseWeb popover */
+      [data-baseweb="popover"],
+      [data-baseweb="popover"] > div,
+      [data-baseweb="menu"],
+      div[role="listbox"],
+      ul[role="listbox"] {
+        background: #0f172a !important;
+        background-color: #0f172a !important;
+        border: 1px solid rgba(148, 163, 184, 0.25) !important;
         border-radius: 12px !important;
-        box-shadow: 0 12px 28px rgba(0, 0, 0, 0.22) !important;
+        box-shadow: 0 12px 28px rgba(0, 0, 0, 0.5) !important;
         padding: 6px !important;
       }
 
+      [data-baseweb="popover"] li,
+      [data-baseweb="menu"] li,
       div[role="option"],
-      div[role="option"] * {
-        background: #ffffff !important;
-        color: #111827 !important;
+      li[role="option"] {
+        background: #0f172a !important;
+        background-color: #0f172a !important;
+        color: #f8fafc !important;
         border-radius: 8px !important;
         margin: 2px 0 !important;
         padding: 10px 12px !important;
         font-weight: 600 !important;
       }
 
-      div[role="option"]:hover {
-        background: #e5e7eb !important;
-        color: #111827 !important;
+      [data-baseweb="popover"] li *,
+      [data-baseweb="menu"] li *,
+      div[role="option"] *,
+      li[role="option"] * {
+        background: transparent !important;
+        background-color: transparent !important;
+        color: #f8fafc !important;
+        font-weight: 600 !important;
       }
 
-      div[aria-selected="true"] {
-        background: #fbbf24 !important;
-        color: #111827 !important;
+      [data-baseweb="popover"] li:hover,
+      [data-baseweb="menu"] li:hover,
+      div[role="option"]:hover,
+      li[role="option"]:hover {
+        background: #1e293b !important;
+        background-color: #1e293b !important;
+        color: #ffffff !important;
+      }
+
+      [data-baseweb="popover"] li[aria-selected="true"],
+      [data-baseweb="menu"] li[aria-selected="true"],
+      div[aria-selected="true"],
+      li[aria-selected="true"] {
+        background: rgba(251, 191, 36, 0.2) !important;
+        background-color: rgba(251, 191, 36, 0.2) !important;
+        color: #fbbf24 !important;
         font-weight: 800 !important;
+      }
+
+      [data-baseweb="popover"] li[aria-selected="true"] *,
+      div[aria-selected="true"] *,
+      li[aria-selected="true"] * {
+        color: #fbbf24 !important;
       }
 
       div[data-testid="stDataFrame"] * {
@@ -486,7 +497,7 @@ with header:
 left, center, right = st.columns([1.05, 1.9, 1.05], gap="large")
 
 with left:
-    st.subheader("Human")
+    st.markdown('<h3 style="color:#3b82f6 !important;">Human <span style="font-size:0.7em;">(blue on map)</span></h3>', unsafe_allow_html=True)
     st.metric("Score", human.score)
     st.metric("Trains Left", human.trains)
     st.write("Ticket:", route_text(human))
@@ -511,6 +522,12 @@ with left:
 with center:
     st.subheader("Board")
     st.caption("Edge labels show required trains. Hover a route for full details.")
+    st.markdown(
+        '<span style="color:#3b82f6; font-weight:700;">&#9632; Human (blue)</span>'
+        ' &nbsp;&nbsp; '
+        '<span style="color:#ef4444; font-weight:700;">&#9632; AI (red)</span>',
+        unsafe_allow_html=True,
+    )
 
     show_only_claimable = st.session_state.show_only_claimable_routes
     if show_only_claimable:
@@ -591,7 +608,7 @@ with center:
     render_map(current_game)
 
 with right:
-    st.subheader("AI")
+    st.markdown('<h3 style="color:#ef4444 !important;">AI <span style="font-size:0.7em;">(red on map)</span></h3>', unsafe_allow_html=True)
     st.metric("Score", ai.score)
     st.metric("Trains Left", ai.trains)
     st.write("Ticket:", route_text(ai))

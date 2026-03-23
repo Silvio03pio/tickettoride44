@@ -33,7 +33,7 @@ def _owner_edge_color(owner_name: str | None) -> str | None:
     if str(owner_name) == "AI":
         return "#ef4444"  # red
     if str(owner_name) == "Human":
-        return "#22c55e"  # green
+        return "#3b82f6"  # blue
     # Unknown owner name (future extensions): fall back to a readable neutral.
     return "#a78bfa"  # purple
 
@@ -185,10 +185,10 @@ def create_map(graph, selected_path_id=None):
         path_id = path.get_path_id()
 
 
-        if occupation == "human":
-            edge_color = "#22c55e"
+        if occupation == "Human":
+            edge_color = "#3b82f6"  # blue for Human
         elif occupation == "AI":
-            edge_color = "#ef4444"
+            edge_color = "#ef4444"  # red for AI
         else:
             edge_color = path_display_color(path_colour)
 
