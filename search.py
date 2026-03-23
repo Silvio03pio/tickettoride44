@@ -18,7 +18,7 @@ import evaluation
 import rules
 
 # ── Programmer-controlled knobs ──────────────────────────────────────────────
-N_SIMULATIONS: int = 100          # Total MCTS iterations (tree walks)
+N_SIMULATIONS: int = 10          # Total MCTS iterations (tree walks)
 EXPLORATION_CONSTANT: float = 1.41  # C in UCB1 = sqrt(2) ≈ 1.41
 MAX_ROLLOUT_STEPS: int = 10_000   # Safety cap on rollout depth
 OPPONENT_TEMPERATURE: float = 1.0   # Boltzmann temperature for opponent policy

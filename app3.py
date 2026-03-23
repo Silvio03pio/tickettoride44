@@ -27,6 +27,10 @@ def ensure_session_state():
         st.session_state.last_message = None
     if "rollouts" not in st.session_state:
         st.session_state.rollouts = 50
+    if "ai_algorithm" not in st.session_state:
+        st.session_state.ai_algorithm = "mcts"
+    if "ab_depth" not in st.session_state:
+        st.session_state.ab_depth = 3
     if "show_debug" not in st.session_state:
         st.session_state.show_debug = False
     if "ai_last_executed_round" not in st.session_state:
@@ -231,8 +235,29 @@ with st.sidebar:
         reset_game_state()
         st.rerun()
 
+    st.markdown("---")
+    st.markdown("### AI Settings")
+
+    algo_options = ["MCTS (Monte Carlo Tree Search)", "Alpha-Beta Pruning"]
+    algo_index = 0 if st.session_state.ai_algorithm == "mcts" else 1
+    algo_choice = st.selectbox("AI Algorithm", algo_options, index=algo_index)
+    st.session_state.ai_algorithm = "mcts" if algo_choice == algo_options[0] else "alphabeta"
+
+    if st.session_state.ai_algorithm == "mcts":
+        st.session_state.rollouts = st.number_input(
+            "MCTS Rollouts", min_value=1, max_value=10000,
+            value=st.session_state.rollouts, step=10,
+        )
+    else:
+        st.session_state.ab_depth = st.number_input(
+            "Alpha-Beta Depth", min_value=1, max_value=20,
+            value=st.session_state.ab_depth, step=1,
+        )
+
     show_debug = st.session_state.show_debug
     rollouts = st.session_state.rollouts
+    ai_algorithm = st.session_state.ai_algorithm
+    ab_depth = st.session_state.ab_depth
 
 st.markdown(
     """
@@ -684,7 +709,7 @@ with a2:
             st.rerun()
 
         _append_message("Human drew 1 card.")
-        ai_messages = execute_ai_turn(current_game, n_rollouts=int(rollouts))
+        ai_messages = execute_ai_turn(current_game, n_rollouts=int(rollouts), algorithm=ai_algorithm, ab_depth=int(ab_depth))
         _append_messages(ai_messages)
         st.rerun()
 
@@ -711,7 +736,7 @@ with a3:
 
         _append_message(f"Human claimed {_describe_path(path_obj)} using {needed} {colour} card(s).")
         st.session_state.selected_path_id = None
-        ai_messages = execute_ai_turn(current_game, n_rollouts=int(rollouts))
+        ai_messages = execute_ai_turn(current_game, n_rollouts=int(rollouts), algorithm=ai_algorithm, ab_depth=int(ab_depth))
         _append_messages(ai_messages)
         st.rerun()
 
@@ -762,6 +787,6 @@ if active_player.name == "AI" and not current_game.terminal:
     last = st.session_state.get("ai_last_executed_round", None)
     if last != current_game.current_round:
         st.session_state.ai_last_executed_round = current_game.current_round
-        ai_messages = execute_ai_turn(current_game, n_rollouts=int(rollouts))
+        ai_messages = execute_ai_turn(current_game, n_rollouts=int(rollouts), algorithm=ai_algorithm, ab_depth=int(ab_depth))
         _append_messages(ai_messages)
         st.rerun()

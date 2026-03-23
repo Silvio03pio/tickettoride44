@@ -96,7 +96,14 @@ def create_new_game(
     return current_game
 
 
-def execute_ai_turn(current_game, n_rollouts=1000):
+def execute_ai_turn(current_game, n_rollouts=1000, algorithm="mcts", ab_depth=3):
+    """
+    Execute the AI's turn using the chosen algorithm.
+
+    algorithm: "mcts" for Monte Carlo Tree Search, "alphabeta" for Alpha-Beta Pruning
+    n_rollouts: number of simulations for MCTS
+    ab_depth: search depth for Alpha-Beta Pruning
+    """
     messages = []
 
     if current_game.terminal:
@@ -109,18 +116,27 @@ def execute_ai_turn(current_game, n_rollouts=1000):
     action = None
     policy_used = None
 
-    try:
-        import search
+    if algorithm == "alphabeta":
+        try:
+            action = rules.alpha_beta_pruning_decide_action(current_game, depth=int(ab_depth))
+            if action is not None:
+                policy_used = f"Alpha-Beta (depth={ab_depth})"
+        except Exception as exc:
+            messages.append(f"Alpha-Beta unavailable, fallback to random policy. ({exc})")
+            action = None
+    else:
+        try:
+            import search
 
-        action, _values = search.choose_best_action_monte_carlo(
-            current_game,
-            n_simulations=int(n_rollouts),
-        )
-        if action is not None:
-            policy_used = "Monte Carlo"
-    except Exception as exc:
-        messages.append(f"Monte Carlo unavailable, fallback to random policy. ({exc})")
-        action = None
+            action, _values = search.choose_best_action_monte_carlo(
+                current_game,
+                n_simulations=int(n_rollouts),
+            )
+            if action is not None:
+                policy_used = f"MCTS ({n_rollouts} rollouts)"
+        except Exception as exc:
+            messages.append(f"Monte Carlo unavailable, fallback to random policy. ({exc})")
+            action = None
 
     if action is None:
         actions = [a for a in rules.legal_actions(current_game) if getattr(a, "type", None) != "q"]

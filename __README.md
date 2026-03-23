@@ -28,7 +28,12 @@ This installs:
 python main.py
 ```
 
-Play the game directly in the terminal. You type commands (`d` to draw, `c` to claim, `q` to quit, `h` to see your hand, `s` for scoreboard, `r` for claimed routes).
+Play the game directly in the terminal. At startup you are prompted to choose the AI algorithm:
+
+1. **MCTS (Monte Carlo Tree Search)** — you then enter the number of rollouts (default 50).
+2. **Alpha-Beta Pruning** — you then enter the search depth (default 3).
+
+During the game you type commands (`d` to draw, `c` to claim, `q` to quit, `h` to see your hand, `s` for scoreboard, `r` for claimed routes).
 
 ### Web UI mode (Streamlit)
 
@@ -36,7 +41,7 @@ Play the game directly in the terminal. You type commands (`d` to draw, `c` to c
 python main2.py
 ```
 
-Opens an interactive browser-based interface with a visual map, route selection, and evaluation panels.
+Opens an interactive browser-based interface with a visual map, route selection, and evaluation panels. The sidebar includes an **AI Settings** section where you can switch between MCTS and Alpha-Beta Pruning and configure the rollout count or search depth at any time during the game.
 
 ## Troubleshooting
 
@@ -52,9 +57,9 @@ Opens an interactive browser-based interface with a visual map, route selection,
 
 | File | Description |
 |------|-------------|
-| `main.py` | Terminal-mode entry point. Runs a full Human vs AI game in the console with text-based input (draw, claim, quit, view hand/score/routes). No GUI required. |
+| `main.py` | Terminal-mode entry point. Prompts the player to choose the AI algorithm (MCTS or Alpha-Beta Pruning) and its parameter (rollouts or depth), then runs a full Human vs AI game in the console with text-based input (draw, claim, quit, view hand/score/routes). No GUI required. |
 
-| `main2.py` | Streamlit entry point and shared helpers. Contains `create_new_game()` (initialises the board, players, deck, and tickets), `execute_ai_turn()` (runs the AI's decision via MCTS or fallback), hand formatting utilities, and the terminal print helpers (`_print_turn_header`, `_print_final_scoring`). Running `python main2.py` launches the Streamlit web UI. |
+| `main2.py` | Streamlit entry point and shared helpers. Contains `create_new_game()` (initialises the board, players, deck, and tickets), `execute_ai_turn()` (runs the AI's decision via MCTS or Alpha-Beta Pruning), hand formatting utilities, and the terminal print helpers (`_print_turn_header`, `_print_final_scoring`). Running `python main2.py` launches the Streamlit web UI. |
 
 | `app3.py` | Streamlit web UI. Builds the full browser-based interface: interactive board map (via PyVis), player panels, route selection/search, draw and claim buttons, evaluation dashboard, and debug panels. |
 
@@ -135,7 +140,11 @@ A positive utility means the AI won; negative means the human won.
 
 ### AI Decision-Making
 
-The AI uses **Monte Carlo Tree Search (MCTS)** to decide its moves:
+The player can choose between two AI algorithms at the start of each game (terminal mode) or at any time via the sidebar (web UI):
+
+#### Monte Carlo Tree Search (MCTS)
+
+Controlled by the **number of rollouts** (default 50). The four phases per iteration:
 
 1. **Selection** — walk down the search tree, picking the most promising child node using the UCB1 formula (balancing exploitation and exploration).
 2. **Expansion** — when a leaf node is reached, expand one untried action.
@@ -145,6 +154,15 @@ The AI uses **Monte Carlo Tree Search (MCTS)** to decide its moves:
 After many iterations, the AI picks the action with the **most visits** (robust child selection).
 
 During MCTS, opponent turns are modelled as **stochastic environment transitions**: the opponent's moves are sampled using a Boltzmann-weighted policy based on a heuristic evaluation function `E(s)`, rather than being part of the search tree. This reflects the **partial observability** of the game — the AI cannot see the opponent's hand.
+
+#### Alpha-Beta Pruning
+
+Controlled by the **search depth** (default 3). This is a classic minimax search with alpha-beta pruning:
+
+- **Maximising nodes** correspond to the AI's turns; **minimising nodes** correspond to the opponent's turns.
+- At terminal states the true `utility()` is used. At depth-limited leaves the heuristic `E(s)` provides an estimate.
+- The opponent is modelled with **imperfect information**: since the AI cannot see the opponent's hand, the opponent is assumed to be able to claim any route they have enough trains for (card constraints are ignored).
+- Alpha-beta cut-offs prune branches that cannot affect the final decision, making the search more efficient than plain minimax.
 
 ### Non-Terminal Evaluation: E(s)
 

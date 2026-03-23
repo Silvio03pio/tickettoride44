@@ -15,6 +15,7 @@ from main2 import (
 _COLOURS = ["red", "blue", "green", "yellow", "black", "white", "orange", "pink"]
 
 DEFAULT_ROLLOUTS = 50
+DEFAULT_AB_DEPTH = 3
 
 
 def route_text(player):
@@ -139,17 +140,65 @@ def human_turn(current_game, rollouts):
         print("Invalid input. Type d, c, q, h, s, or r.")
 
 
-def ai_turn(current_game, rollouts):
+def ai_turn(current_game, algorithm, rollouts, ab_depth):
     _print_turn_header(current_game)
-    messages = execute_ai_turn(current_game, n_rollouts=rollouts)
+    messages = execute_ai_turn(current_game, n_rollouts=rollouts, algorithm=algorithm, ab_depth=ab_depth)
     for msg in messages:
         print(f"  {msg}")
+
+
+def choose_algorithm():
+    """Prompt the player to choose the AI algorithm and its parameters."""
+    print("\nChoose AI algorithm:")
+    print("  1) Monte Carlo Tree Search (MCTS)")
+    print("  2) Alpha-Beta Pruning")
+
+    while True:
+        choice = input("Enter 1 or 2: ").strip()
+        if choice == "1":
+            algorithm = "mcts"
+            while True:
+                raw = input(f"Number of MCTS rollouts [{DEFAULT_ROLLOUTS}]: ").strip()
+                if raw == "":
+                    rollouts = DEFAULT_ROLLOUTS
+                    break
+                try:
+                    rollouts = int(raw)
+                    if rollouts > 0:
+                        break
+                    print("Please enter a positive integer.")
+                except ValueError:
+                    print("Please enter a valid integer.")
+            return algorithm, rollouts, DEFAULT_AB_DEPTH
+
+        if choice == "2":
+            algorithm = "alphabeta"
+            while True:
+                raw = input(f"Alpha-Beta search depth [{DEFAULT_AB_DEPTH}]: ").strip()
+                if raw == "":
+                    depth = DEFAULT_AB_DEPTH
+                    break
+                try:
+                    depth = int(raw)
+                    if depth > 0:
+                        break
+                    print("Please enter a positive integer.")
+                except ValueError:
+                    print("Please enter a valid integer.")
+            return algorithm, DEFAULT_ROLLOUTS, depth
+
+        print("Invalid choice. Please enter 1 or 2.")
 
 
 def main():
     print("=" * 60)
     print("  TICKET TO RIDE — Human vs AI  (Terminal Mode)")
     print("=" * 60)
+
+    algorithm, rollouts, ab_depth = choose_algorithm()
+    algo_label = "MCTS" if algorithm == "mcts" else "Alpha-Beta Pruning"
+    param_label = f"{rollouts} rollouts" if algorithm == "mcts" else f"depth {ab_depth}"
+    print(f"\nAI algorithm: {algo_label} ({param_label})")
 
     current_game = create_new_game()
     human = current_game.players[0]
@@ -159,15 +208,13 @@ def main():
     print(f"AI ticket:    {route_text(ai)}")
     print_scoreboard(current_game)
 
-    rollouts = DEFAULT_ROLLOUTS
-
     while not current_game.terminal:
         active = current_game.current_player
 
         if active.name == "Human":
             human_turn(current_game, rollouts)
         else:
-            ai_turn(current_game, rollouts)
+            ai_turn(current_game, algorithm, rollouts, ab_depth)
 
         print_scoreboard(current_game)
 

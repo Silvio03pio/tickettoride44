@@ -394,14 +394,17 @@ def _ab_search(sim_state, depth, alpha, beta, maximizing, our_name, opp_name):
         return value
 
 
-def alpha_beta_pruning_decide_action(state):
+def alpha_beta_pruning_decide_action(state, depth=None):
     """
     Choose the best legal action for the current player using Alpha-Beta Pruning.
 
-    Search depth is controlled by AB_DEPTH (module-level constant).
+    Search depth is controlled by the depth parameter (defaults to AB_DEPTH).
     Terminal nodes are scored with evaluation.utility; depth-limit nodes with E_s.
     Returns an Action object.
     """
+    if depth is None:
+        depth = AB_DEPTH
+
     our_name = state.current_player.name
     opp_name = next(p.name for p in state.players if p.name != our_name)
 
@@ -418,13 +421,13 @@ def alpha_beta_pruning_decide_action(state):
         child = copy.deepcopy(state)
         apply_action(child, action)
         child_max = (child.current_player.name == our_name)
-        v = _ab_search(child, AB_DEPTH - 1, alpha, beta, child_max, our_name, opp_name)
+        v = _ab_search(child, depth - 1, alpha, beta, child_max, our_name, opp_name)
         if v > best_value:
             best_value  = v
             best_action = action
         alpha = max(alpha, v)
 
-    print(f"  Alpha-Beta: evaluation value of chosen action = {best_value}")
+    print(f"  Alpha-Beta (depth={depth}): evaluation value of chosen action = {best_value}")
     return best_action if best_action is not None else Action("d")
 
 
